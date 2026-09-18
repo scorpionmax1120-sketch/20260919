@@ -6,6 +6,7 @@
 
 先執行一次：python3 init_db.py
 """
+import pathlib
 import secrets
 import sqlite3
 
@@ -22,7 +23,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DB = "app.db"
+# 用「這個檔案所在的資料夾」當基準，不管你從哪裡執行都找得到資料庫。
+# 如果寫成 DB = "app.db"，從別的資料夾啟動就會建出一個空的新檔，
+# 然後報 no such table: users。
+DB = pathlib.Path(__file__).parent / "app.db"
 TOKENS: dict[str, str] = {}
 
 

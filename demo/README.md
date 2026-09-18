@@ -19,6 +19,7 @@
 | `step-6-protected-me` | `/api/me` 受保護，**完整流程通了** | fastapi, uvicorn |
 | `step-7-tests` | 加上 13 個自動測試 | + pytest, httpx |
 | `step-8-sqlite` | 假資料換成 SQLite，14 個測試 | + pytest, httpx |
+| `step-9-deploy` | **可部署版**：後端供應前端、自動建表、17 個測試 | + pytest, httpx |
 
 ## 通用啟動方式
 
@@ -30,7 +31,9 @@ pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
-有 `web/` 資料夾的步驟（5 以後），前端要另外用 VS Code 的 **Live Server** 開啟
+step-9 例外：它由後端自己供應前端，直接開 <http://127.0.0.1:8000> 就好。
+
+其他有 `web/` 資料夾的步驟（5–8），前端要另外用 VS Code 的 **Live Server** 開啟
 （開 `web/index.html` → 右下角 Go Live），網址會是 `http://127.0.0.1:5500`。
 
 > 不要直接雙擊 HTML 檔。`file://` 開啟會產生另一種錯誤，不是課堂要示範的那個。
@@ -50,6 +53,7 @@ uvicorn main:app --reload
 - step-2 ~ step-6 的每支 API 都回傳預期的狀態碼
 - step-7 `pytest` → **13 passed**
 - step-8 `pytest` → **14 passed**
+- step-9 `pytest` → **17 passed**；並實際用 `PORT=8000 python main.py` 啟動，確認同源供應前端、API 未被靜態路由攔截、刪掉 `app.db` 重啟後測試帳號會自動重建
 
 ## 注意
 

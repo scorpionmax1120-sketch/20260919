@@ -235,11 +235,11 @@ body.editing #note:empty::after{content:"（點這裡輸入這一頁的講者備
   <div class="pad">
     <div class="eyebrow" data-r="">nutc@workshop:~$ <b>./check-env.sh</b></div>
     <h2 class="h2" data-r="" style="margin-top: 2cqw;">開始前，先檢查</h2>
-    <div class="code" data-r=""><span class="c"># 在終端機逐行貼上，四行都要有版本號跑出來</span>
+    <div class="code" data-r=""><span class="c"># macOS 用 python3 / pip3　·　Windows 用 python / pip</span>
 <span class="f">python3</span> --version        <span class="c"># 需要 3.10 以上</span>
 <span class="f">pip3</span> --version
 <span class="f">git</span> --version
-<span class="f">code</span> --version           <span class="c"># VS Code 命令列工具</span></div>
+<span class="f">code</span> --version           <span class="c"># 找不到請看講義的安裝指引</span></div>
     <div class="grid g2" data-r="" style="margin-top: 2.4cqw;">
       <div class="callout ok" style="margin-top:0"><b>四行都有輸出</b> → 太好了，你可以開始了。</div>
       
@@ -541,8 +541,9 @@ Authorization: Bearer eyJhbGci...   <span class="c">← 通行證放這裡</span
 <span class="c"># 順便把預設分支名稱設成 main（現在的慣例）</span>
 <span class="f">git</span> config --global init.defaultBranch main
 
-<span class="c"># 確認一下</span>
-<span class="f">git</span> config --list | grep user</div>
+<span class="c"># 確認一下（應該印出你剛剛設定的值）</span>
+<span class="f">git</span> config user.name
+<span class="f">git</span> config user.email</div>
     <div class="callout" data-r=""><b>email 建議用你 GitHub 註冊的那個。</b>否則 GitHub 不會把 commit 算在你的貢獻紀錄上。</div>
   </div>
 </section>
@@ -552,7 +553,8 @@ Authorization: Bearer eyJhbGci...   <span class="c">← 通行證放這裡</span
     <div class="eyebrow" data-r="">nutc@workshop:~$ <b>./exercise-01.sh</b> <span class="hot">← 一起做</span></div>
     <h3 class="h3" data-r="" style="margin-top: 1.4cqw;">實作：你的第一個 commit</h3>
     <div class="code sm" data-r=""><span class="c"># 1. 建立專案資料夾並進入</span>
-<span class="f">mkdir</span> miniprofile &amp;&amp; <span class="f">cd</span> miniprofile
+<span class="f">mkdir</span> miniprofile
+<span class="f">cd</span> miniprofile
 
 <span class="c"># 2. 讓 Git 開始管理這個資料夾</span>
 <span class="f">git</span> init
@@ -673,7 +675,8 @@ login-api          ●───●───●     <i>← 在這裡大膽實驗<
 
 <span class="c"># 2. 新增一個檔案並 commit</span>
 <span class="f">echo</span> <span class="s">"&lt;h1&gt;Hello&lt;/h1&gt;"</span> &gt; index.html
-<span class="f">git</span> add . &amp;&amp; <span class="f">git</span> commit -m <span class="s">"新增首頁骨架"</span>
+<span class="f">git</span> add .
+<span class="f">git</span> commit -m <span class="s">"新增首頁骨架"</span>
 
 <span class="c"># 3. 回到主線並合併</span>
 <span class="f">git</span> switch main

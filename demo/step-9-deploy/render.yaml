@@ -1,0 +1,13 @@
+# Render Blueprint（選用）
+#
+# 這個檔案讓 Render 自動帶入設定。但課堂上建議直接用網頁介面填，
+# 欄位一模一樣，而且看得到自己在設定什麼。
+# 如果 Render 不接受這個格式，就刪掉它改用網頁介面，不影響任何功能。
+
+services:
+  - type: web
+    name: miniprofile
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT

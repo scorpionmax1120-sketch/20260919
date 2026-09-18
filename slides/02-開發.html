@@ -243,6 +243,7 @@ body.editing #note:empty::after{content:"（點這裡輸入這一頁的講者備
     <div class="grid g2" data-r>
       <div>
         <div class="code sm" style="margin-top:0"><span class="c"># 在上午建立的 miniprofile 資料夾裡</span>
+<span class="c"># Windows 請把 python3 改成 python</span>
 <span class="f">python3</span> -m venv .venv
 
 <span class="c"># macOS / Linux</span>
@@ -457,15 +458,18 @@ TOKENS = {}   <span class="c"># token → username</span>
     <div class="eyebrow" data-r>STEP 6 — <b>前端呼叫後端</b></div>
     <h3 class="h3" data-r style="margin-top:1.4cqw">fetch：這就是那座橋</h3>
     <div class="code xs" data-r><span class="c">// web/login.js</span>
-f.onsubmit = <span class="k">async</span> (e) =&gt; {
+<span class="k">const</span> $ = (id) =&gt; document.getElementById(id);   <span class="c">// 明確取元素</span>
+<span class="k">const</span> form = $(<span class="s">"f"</span>), msg = $(<span class="s">"msg"</span>);
+
+form.onsubmit = <span class="k">async</span> (e) =&gt; {
   e.preventDefault();                       <span class="c">// 不要讓表單重整頁面</span>
 
-  <span class="k">const</span> res = <span class="k">await</span> fetch(<span class="s">"http://127.0.0.1:8000/api/login"</span>, {
+  <span class="k">const</span> res = <span class="k">await</span> fetch(API + <span class="s">"/api/login"</span>, {
     method: <span class="s">"POST"</span>,                         <span class="c">// ← 上午講的方法</span>
     headers: { <span class="s">"Content-Type"</span>: <span class="s">"application/json"</span> },  <span class="c">// ← 標頭</span>
     body: JSON.stringify({                  <span class="c">// ← Body</span>
-      username: f.username.value,
-      password: f.password.value
+      username: form.username.value,
+      password: form.password.value
     })
   });
 
@@ -550,22 +554,26 @@ app.add_middleware(
     <div class="eyebrow" data-r>STEP 8 — <b>最後一塊</b></div>
     <h3 class="h3" data-r style="margin-top:1.4cqw">My Profile 頁面</h3>
     <div class="code xs" data-r><span class="c">// web/profile.js</span>
+<span class="k">const</span> $ = (id) =&gt; document.getElementById(id);
+
 (<span class="k">async</span> () =&gt; {
   <span class="k">const</span> token = localStorage.getItem(<span class="s">"token"</span>);
   <span class="k">if</span> (!token) { location.href = <span class="s">"index.html"</span>; <span class="k">return</span>; }   <span class="c">// 沒票就出去</span>
 
-  <span class="k">const</span> res = <span class="k">await</span> fetch(<span class="s">"http://127.0.0.1:8000/api/me"</span>, {
+  <span class="k">const</span> res = <span class="k">await</span> fetch(API + <span class="s">"/api/me"</span>, {
     headers: { <span class="s">"Authorization"</span>: <span class="s">"Bearer "</span> + token }      <span class="c">// 出示通行證</span>
   });
 
   <span class="k">if</span> (res.status === <span class="s">401</span>) { location.href = <span class="s">"index.html"</span>; <span class="k">return</span>; }
 
   <span class="k">const</span> me = <span class="k">await</span> res.json();
-  name.textContent = me.name;
-  dept.textContent = me.dept;
+  $(<span class="s">"username"</span>).textContent = me.username;
+  $(<span class="s">"name"</span>).textContent = me.name;      <span class="c">// ← 不能寫 name.textContent</span>
+  $(<span class="s">"dept"</span>).textContent = me.dept;
 })();
 
-logout.onclick = () =&gt; { localStorage.removeItem(<span class="s">"token"</span>); location.href = <span class="s">"index.html"</span>; };</div>
+$(<span class="s">"logout"</span>).onclick = () =&gt; { localStorage.removeItem(<span class="s">"token"</span>); location.href = <span class="s">"index.html"</span>; };</div>
+    <div class="callout" data-r><b>不能寫 <span class="hot">name.textContent</span>：</b><span class="hot">window.name</span> 是瀏覽器內建屬性，id 蓋不過它 —— 不報錯、畫面也不動。</div>
   </div>
 </section>
 
@@ -670,7 +678,7 @@ logout.onclick = () =&gt; { localStorage.removeItem(<span class="s">"token"</spa
     <div class="eyebrow" data-r>EXPERIMENT — <b>現場做</b></div>
     <h3 class="h3" data-r style="margin-top:1.4cqw">讓隔壁同學連到你的網站</h3>
     <div class="code sm" data-r><span class="c"># 1. 查出你在這間教室的 IP</span>
-<span class="f">ipconfig</span> getifaddr en0      <span class="c"># macOS</span>
+<span class="f">ipconfig</span> getifaddr en0      <span class="c"># macOS（沒輸出就改試 en1）</span>
 <span class="f">ipconfig</span>                     <span class="c"># Windows，找 IPv4 位址</span>
 <span class="c"># 假設拿到 192.168.1.37</span>
 
@@ -744,23 +752,54 @@ SECRET_KEY = os.environ.get(<span class="s">"SECRET_KEY"</span>, <span class="s"
   </div>
 </section>
 
-<section class="slide" data-tag="TOPIC 04" data-note="實際做一次部署。這裡會有等待時間，趁建置的時候回顧 Git 那節 —— 因為部署是靠 git push 觸發的，兩節在這裡接起來了。">
+<section class="slide" data-tag="DEPLOY" data-note="這是部署最關鍵的觀念轉折：本機是兩個服務，正式環境合併成一個。合併之後同源，CORS 問題自動消失 —— 但本機開發還是會遇到，所以那段設定要留著。">
+  <div class="pad">
+    <div class="eyebrow" data-r>BEFORE DEPLOY — <b>先從兩個服務變成一個</b></div>
+    <h3 class="h3" data-r style="margin-top:1.2cqw">讓後端自己供應前端</h3>
+    <div class="flow" data-r>
+      <div class="st"><b>本機開發</b><strong>兩個服務</strong><span>前端 Live Server :5500<br>後端 uvicorn :8000<br><span class="hot">不同來源 → 需要 CORS</span></span></div>
+      <div class="ar">──▶</div>
+      <div class="st"><b>正式環境</b><strong>一個服務</strong><span>FastAPI 同時給 web/ 和 API<br>同一個網址<br><span class="hot">同源 → 沒有 CORS</span></span></div>
+    </div>
+    <div class="code sm" data-r><span class="c"># main.py 最後面加這兩行（一定要在所有 API 之後）</span>
+<span class="k">from</span> fastapi.staticfiles <span class="k">import</span> StaticFiles
+app.mount(<span class="s">"/"</span>, StaticFiles(directory=<span class="s">"web"</span>, html=<span class="k">True</span>), name=<span class="s">"web"</span>)
+
+<span class="c">// web/login.js、profile.js 的第一行改成自動判斷</span>
+<span class="k">const</span> API = location.port === <span class="s">"5500"</span> ? <span class="s">"http://127.0.0.1:8000"</span> : <span class="s">""</span>;</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="DEPLOY" data-note="實際做一次。建置要 2–5 分鐘，趁等待時回顧 Git 那節 —— 部署是靠 git push 觸發的，上午和下午在這裡接起來了。提醒：Render 帳號用 GitHub 登入即可，不用信用卡。">
   <div class="pad">
     <div class="eyebrow" data-r>DEPLOY — <b>一起做</b></div>
-    <h3 class="h3" data-r style="margin-top:1.4cqw">把它送上線</h3>
-    <div class="code sm" data-r><span class="c"># 1. 告訴平台怎麼裝套件</span>
+    <h3 class="h3" data-r style="margin-top:1.2cqw">部署到 Render</h3>
+    <div class="code sm" data-r><span class="c"># 1. 產生套件清單，讓平台知道要裝什麼</span>
 <span class="f">pip</span> freeze > requirements.txt
 
-<span class="c"># 2. 告訴平台怎麼啟動（Procfile 或平台設定）</span>
-<span class="c">#    uvicorn main:app --host 0.0.0.0 --port $PORT</span>
+<span class="c"># 2. 推上 GitHub ← 早上學的 Git 在這裡派上用場</span>
+<span class="f">git</span> add .
+<span class="f">git</span> commit -m <span class="s">"準備部署"</span>
+<span class="f">git</span> push</div>
+    <table class="tbl" data-r style="margin-top:1.4cqw"><tr><th>3. 在 render.com 填三個欄位</th><th>填什麼</th></tr>
+      <tr><td>Language</td><td>Python 3</td></tr>
+      <tr><td>Build Command</td><td>pip install -r requirements.txt</td></tr>
+      <tr><td>Start Command</td><td>uvicorn main:app --host 0.0.0.0 --port $PORT</td></tr>
+    </table>
+    <div class="callout" data-r><b>方案選 Free，按 Create Web Service。</b>等 2–5 分鐘變成 Live，你就拿到一個像 <span class="hot">https://miniprofile-xxxx.onrender.com</span> 的網址。</div>
+  </div>
+</section>
 
-<span class="c"># 3. 推上 GitHub ← 早上學的 Git 在這裡派上用場</span>
-<span class="f">git</span> add . && <span class="f">git</span> commit -m <span class="s">"準備部署"</span>
-<span class="f">git</span> push
-
-<span class="c"># 4. 在平台上連結這個 repo，按下 Deploy</span>
-<span class="c"># 5. 拿到一個網址，例如 https://miniprofile-xxx.onrender.com</span></div>
-    <div class="callout" data-r><b>別忘了回頭改 CORS。</b>allow_origins 現在要加上你的正式網址，否則線上版的前端會被自己的後端擋掉。</div>
+<section class="slide" data-tag="DEPLOY" data-note="這三個坑一定要講，否則課堂上會有一堆人以為自己做壞了。第一個坑最常見 —— demo 前記得先自己打開一次把服務叫醒。第二個坑是 SQLite 在免費方案上的真實限制，也是通往「該學真正的資料庫了」的橋。">
+  <div class="pad">
+    <div class="eyebrow" data-r>WARNING — <b>免費方案的三個坑</b></div>
+    <h3 class="h3" data-r style="margin-top:1.2cqw">上線之後會遇到的事</h3>
+    <div class="grid g3" data-r>
+      <div class="card"><b>坑 1</b><strong>閒置會睡著</strong><span>沒人訪問一段時間後服務自動停機，下一個人打開要等 <span class="hot">30–60 秒</span>冷啟動。<br><br>不是壞了，是在開機。</span></div>
+      <div class="card"><b>坑 2</b><strong>硬碟是暫時的</strong><span>服務一重啟，<span class="hot">app.db 就消失</span>，註冊的資料全不見。<br><br>所以程式每次啟動都要重建資料表。</span></div>
+      <div class="card"><b>坑 3</b><strong>規則會變</strong><span>額度、休眠時間、要不要綁卡，平台隨時在調整。<br><br>正式用之前自己先跑一次。</span></div>
+    </div>
+    <div class="callout" data-r><b>坑 2 才是重點：</b>要真的保存資料，必須用<span class="hot">外部資料庫</span>，不能用跟服務一起消失的 SQLite 檔。這就是你下一步該學的東西。</div>
   </div>
 </section>
 
@@ -772,6 +811,7 @@ SECRET_KEY = os.environ.get(<span class="s">"SECRET_KEY"</span>, <span class="s"
       <div>
         <ul class="bullets tight" style="margin-top:0">
           <li>用手機的行動網路打開<span>不要用教室 Wi-Fi —— 那不算真的對外</span></li>
+          <li>第一次打開很慢是正常的<span>免費方案冷啟動要 30–60 秒，不是你做壞了</span></li>
           <li>網址列有鎖頭<span>沒有的話憑證沒設定好</span></li>
           <li>登入流程完整走一次<span>正確帳密、錯誤帳密都要試</span></li>
         </ul>

@@ -2,8 +2,10 @@
 import pathlib
 import sqlite3
 
-con = sqlite3.connect("app.db")
-con.executescript(pathlib.Path("schema.sql").read_text(encoding="utf-8"))
+BASE = pathlib.Path(__file__).parent      # 以這個檔案的位置為基準
+
+con = sqlite3.connect(BASE / "app.db")
+con.executescript((BASE / "schema.sql").read_text(encoding="utf-8"))
 con.commit()
 con.close()
 print("app.db 建好了")
