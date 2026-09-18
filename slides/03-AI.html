@@ -1,0 +1,1147 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>03 AI｜後端伺服器基礎教學</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Noto+Sans+TC:wght@300;400;500;700;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* ══════════ SHARED ══════════ 三份簡報共用：引擎、版面、元件級距 */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{background:var(--void);display:grid;place-items:center;font-family:var(--sans);-webkit-font-smoothing:antialiased}
+#stage{width:min(100vw,177.78vh);aspect-ratio:16/9;container-type:inline-size;position:relative;overflow:hidden;background:var(--bg);color:var(--fg)}
+#fx{position:absolute;inset:0;z-index:5;pointer-events:none}
+
+.slide{position:absolute;inset:0;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .34s cubic-bezier(.22,1,.36,1),visibility .34s}
+.slide.on{opacity:1;visibility:visible;pointer-events:auto}
+.pad{position:absolute;inset:0;padding:4.5cqw 5.4cqw 6.4cqw;display:flex;flex-direction:column}
+.pad>*{min-width:0;max-width:100%;flex:0 0 auto}
+.slide.on [data-r]{animation:rise .52s cubic-bezier(.16,1,.3,1) both;animation-delay:calc(var(--i,0)*65ms)}
+@keyframes rise{from{opacity:0;transform:translateY(1.4cqw)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.slide,.slide.on [data-r]{transition:none;animation:none}}
+
+/* 底部 UI */
+#bar{position:absolute;left:0;bottom:0;height:.34cqw;width:100%;background:var(--acc);transform-origin:0 50%;transform:scaleX(0);transition:transform .34s cubic-bezier(.22,1,.36,1);z-index:6}
+#cnt,#tag{position:absolute;bottom:2.1cqw;font-family:var(--mono);font-size:1.25cqw;color:var(--fg3);letter-spacing:.14em;z-index:6}
+#cnt{right:2.4cqw}#tag{left:2.4cqw}
+.zone{position:absolute;top:0;bottom:0;width:14%;z-index:4;cursor:pointer}
+.zone.l{left:0}.zone.r{right:0}
+
+/* 覆蓋層 */
+.ov{position:absolute;inset:0;z-index:20;background:color-mix(in srgb,var(--void) 94%,transparent);padding:5cqw 6cqw;overflow:auto;display:none;font-family:var(--mono)}
+.ov.on{display:block}
+.ov h5{font-size:1.4cqw;letter-spacing:.3em;color:var(--acc);margin-bottom:2.4cqw;text-transform:uppercase}
+#toc ol{list-style:none;columns:2;column-gap:5cqw}
+#toc li{font-size:1.4cqw;line-height:2.25;color:var(--fg2);cursor:pointer;display:flex;gap:1.4cqw;break-inside:avoid}
+#toc li:hover{color:var(--fg)}
+#toc li b{color:var(--fg4);font-weight:400;min-width:3.4cqw}
+#toc li.cur{color:var(--acc)}
+#note{position:absolute;left:0;right:0;bottom:0;z-index:18;background:var(--panel);border-top:.14cqw solid var(--line);padding:2.2cqw 3cqw;font-size:1.45cqw;line-height:1.85;color:var(--fg2);display:none;max-height:38%;overflow:auto;font-family:var(--sans)}
+#note.on{display:block}
+#note::before{content:"講者備註";display:block;font-family:var(--mono);font-size:1.05cqw;letter-spacing:.28em;color:var(--fg4);margin-bottom:1cqw}
+#help dl{display:grid;grid-template-columns:auto 1fr;gap:1.2cqw 2.4cqw;font-size:1.4cqw;color:var(--fg2)}
+#help dt{color:var(--fg);text-align:right}
+
+/* ══ 元件語彙 ══ */
+.eyebrow{font-size:1.35cqw;color:var(--fg3);letter-spacing:.06em;flex:none}
+.eyebrow b{color:var(--fg);font-weight:400}
+.rule{height:.12cqw;background:var(--line);margin:1.5cqw 0;flex:none}
+
+.h1{font-size:6.6cqw;font-weight:900;line-height:1.08;letter-spacing:-.01em;text-shadow:var(--h1-shadow,none)}
+.h2{font-size:4.2cqw;font-weight:900;line-height:1.14;letter-spacing:-.01em}
+.h3{font-size:3.05cqw;font-weight:700;line-height:1.24}
+.lead{font-size:1.92cqw;color:var(--fg2);font-weight:300;line-height:1.7;max-width:46ch}
+.small{font-size:1.45cqw;color:var(--fg3);line-height:1.7}
+.hot{color:var(--acc)}
+.dim{color:var(--fg3)}
+.cur{display:inline-block;width:.6em;height:.9em;background:var(--fg);vertical-align:-.06em;margin-left:.16em;animation:blink 1.1s steps(1,end) infinite}
+@keyframes blink{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.cur{animation:none}}
+
+.bullets{list-style:none;margin-top:2.1cqw;display:flex;flex-direction:column;gap:1.3cqw}
+.bullets li{font-size:1.9cqw;line-height:1.5;padding-left:3cqw;position:relative;color:var(--fg)}
+.bullets li::before{content:"▸";position:absolute;left:0;color:var(--acc);font-family:var(--mono)}
+.bullets li span{display:block;font-size:1.48cqw;color:var(--fg3);margin-top:.4cqw;line-height:1.6;font-weight:300}
+.bullets.tight li{font-size:1.75cqw}
+
+.grid{display:grid;gap:1.8cqw;margin-top:2.2cqw}
+.grid>*{min-width:0}
+.g2{grid-template-columns:repeat(2,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g4{grid-template-columns:repeat(4,1fr)}
+.card{border:var(--card-bd);background:var(--card-bg);border-radius:var(--radius);box-shadow:var(--shadow);padding:1.8cqw 1.7cqw;position:relative}
+.card b{display:block;font-family:var(--label-font);font-size:1.08cqw;letter-spacing:var(--label-ls);color:var(--acc);margin-bottom:.8cqw;text-transform:uppercase}
+.card strong{display:block;font-size:2.1cqw;font-weight:700;margin-bottom:.7cqw}
+.card span{font-size:1.44cqw;color:var(--fg2);line-height:1.62;font-weight:300}
+
+.code{font-family:var(--mono);font-size:1.44cqw;line-height:1.8;background:var(--code-bg);border:var(--card-bd);border-radius:var(--radius);padding:1.7cqw 2cqw;white-space:pre;overflow:hidden;color:var(--fg2);margin-top:1.9cqw}
+.code .c{color:var(--fg4)}
+.code .k{color:var(--acc)}
+.code .s{color:var(--ok)}
+.code .f{color:var(--fg);font-weight:700}
+.code .hl{background:var(--acc-bg);display:inline-block;min-width:100%}
+.code.sm{font-size:1.28cqw;line-height:1.72}
+.code.xs{font-size:1.2cqw;line-height:1.66}
+
+.callout{border-left:.34cqw solid var(--acc);background:var(--acc-bg);padding:1.35cqw 1.9cqw;margin-top:1.9cqw;font-size:1.65cqw;line-height:1.6}
+.callout b{color:var(--acc)}
+.callout.ok{border-color:var(--ok);background:var(--ok-bg)}
+.callout.ok b{color:var(--ok)}
+
+.flow{display:flex;align-items:stretch;gap:0;margin-top:2.2cqw}
+.flow .st{flex:1;min-width:0;border:var(--card-bd);background:var(--card-bg);border-radius:var(--radius);padding:1.5cqw 1.2cqw;text-align:center}
+.flow .ar{display:flex;align-items:center;padding:0 .9cqw;color:var(--acc);font-family:var(--mono);font-size:1.8cqw}
+.flow .st b{display:block;font-family:var(--label-font);font-size:1.05cqw;color:var(--fg4);letter-spacing:.16em;margin-bottom:.8cqw}
+.flow .st strong{display:block;font-size:1.72cqw;font-weight:700}
+.flow .st span{display:block;font-size:1.25cqw;color:var(--fg3);margin-top:.5cqw;line-height:1.5;font-weight:300}
+
+.tbl{width:100%;border-collapse:collapse;margin-top:2cqw;font-size:1.52cqw}
+.tbl th{font-family:var(--label-font);font-size:1.12cqw;letter-spacing:.16em;color:var(--acc);text-transform:uppercase;text-align:left;padding:.9cqw 1.2cqw;border-bottom:.14cqw solid var(--line)}
+.tbl td{padding:1cqw 1.2cqw;border-bottom:.14cqw solid var(--line2);color:var(--fg2);vertical-align:top;line-height:1.6}
+.tbl td:first-child{color:var(--fg);font-weight:700}
+.tbl tr:last-child td{border-bottom:none}
+
+.tree{font-family:var(--mono);font-size:1.6cqw;line-height:1.92;color:var(--fg2);white-space:pre;margin-top:2cqw;overflow:hidden}
+.tree b{color:var(--fg);font-weight:700}
+.tree i{color:var(--fg4);font-style:normal}
+
+.kbd{font-family:var(--mono);font-size:.82em;border:.12cqw solid var(--fg3);border-bottom-width:.28cqw;padding:.15em .5em;border-radius:.25em;color:var(--fg)}
+.big{font-family:var(--mono);font-size:11cqw;font-weight:700;line-height:.86;color:var(--acc);letter-spacing:-.03em}
+.mt{margin-top:auto}
+.ctr{justify-content:center}
+.chapter .pad{justify-content:center}
+.chapter .big{margin-bottom:1.8cqw}
+.chapter .h2{font-size:5.2cqw}
+.chapter .lead{margin-top:1.8cqw;font-size:2.05cqw}
+.cover .pad{justify-content:flex-end;padding-bottom:9cqw}
+.cover .eyebrow{margin-bottom:auto}
+
+/* ══ 圖片區塊（編輯模式插入） ══ */
+.img{margin-top:1.6cqw;width:60%;position:relative}
+.img img{display:block;width:100%;height:auto;border:var(--card-bd);box-shadow:var(--shadow);background:var(--card-bg)}
+.img.c{margin-left:auto;margin-right:auto}
+.img.r{margin-left:auto}
+.img.free{position:absolute;margin:0;z-index:2}
+
+/* ══ 編輯模式 ══ */
+#ebtn{position:absolute;right:1.2cqw;top:1.2cqw;z-index:7;width:2.6cqw;height:2.6cqw;border:.1cqw solid var(--fg4);background:transparent;color:var(--fg3);font-size:1.4cqw;line-height:1;cursor:pointer;opacity:.18;transition:opacity .2s;border-radius:.3cqw;font-family:var(--sans)}
+#ebtn:hover,body.editing #ebtn{opacity:1}
+:fullscreen #ebtn{opacity:0}
+body.editing{padding-bottom:4.6rem}
+body.editing #stage{width:min(100vw,calc((100vh - 4.6rem)*1.7778))}
+body.editing .zone{display:none}
+body.editing .pad{cursor:text}
+body.editing .pad:focus{outline:none}
+body.editing .pad img{-webkit-user-drag:none;user-select:none}
+body.editing .sel{outline:.18cqw dashed var(--acc);outline-offset:.35cqw}
+body.editing .img.free{cursor:move}
+body.editing #note{cursor:text}
+body.editing #note:empty::after{content:"（點這裡輸入這一頁的講者備註）";color:var(--fg4)}
+#etb{position:fixed;left:0;right:0;bottom:0;z-index:50;display:flex;flex-wrap:wrap;align-items:center;gap:.45rem 1rem;padding:.55rem 1rem;background:#14140f;color:#e8e6dc;font:13px/1.4 system-ui,"Noto Sans TC",sans-serif;border-top:1px solid #333;box-shadow:0 -4px 20px rgba(0,0,0,.35)}
+#etb[hidden]{display:none}
+#etb .g{display:flex;align-items:center;gap:.35rem}
+#etb .g+.g{padding-left:1rem;border-left:1px solid #333}
+#etb button,#etb .btn{font:inherit;padding:.35rem .7rem;border:1px solid #444;background:#222;color:#e8e6dc;border-radius:4px;cursor:pointer;white-space:nowrap;display:inline-block}
+#etb button:hover,#etb .btn:hover{background:#333;border-color:#666}
+#etb .primary{background:#ff9a4d;color:#14140f;border-color:#ff9a4d;font-weight:700}
+#etb .primary:hover{background:#ffb070}
+#etb .danger:hover{background:#5a1f1f;border-color:#a33}
+#etb #epos{min-width:4.5rem;text-align:center;font-variant-numeric:tabular-nums;color:#aaa}
+#etb .hint{flex-basis:100%;color:#8a887c;font-size:12px}
+#bstrip{position:absolute;z-index:9;display:flex;gap:.15cqw;padding:0 0 .35cqw 0;transform:translate(-100%,-100%)}
+#bstrip[hidden]{display:none}
+#bstrip button{font:1.1cqw/1 system-ui,sans-serif;width:2.3cqw;height:2.3cqw;border:none;background:#14140f;color:#fff;cursor:pointer;border-radius:.25cqw;padding:0}
+#bstrip button:hover{background:var(--acc);color:#14140f}
+#bstrip button[data-act=free]{width:auto;padding:0 .6cqw}
+#bstrip button.on{background:var(--acc);color:#14140f}
+#bstrip:not(.img) .img-only{display:none}
+#bhandle{position:absolute;z-index:9;width:1.5cqw;height:1.5cqw;background:var(--acc);border:.12cqw solid #14140f;cursor:nwse-resize;transform:translate(-50%,-50%);border-radius:.15cqw}
+#bhandle[hidden]{display:none}
+#dbanner,#toast{position:absolute;left:50%;transform:translateX(-50%);z-index:30;display:flex;gap:.6rem;align-items:center;background:#14140f;color:#fff;padding:.5rem .9rem;border-radius:6px;font:13px system-ui,"Noto Sans TC",sans-serif;box-shadow:0 4px 18px rgba(0,0,0,.4);max-width:90%}
+#dbanner{top:1.2cqw}
+#toast{bottom:4cqw;pointer-events:none}
+#dbanner[hidden],#toast[hidden]{display:none}
+#dbanner button{font:inherit;padding:.25rem .6rem;border:1px solid #555;background:#222;color:#fff;border-radius:4px;cursor:pointer}
+#dbanner button:hover{background:#444}
+
+/* ══════════ SKIN ══════════ 03 粗獷海報 / Neo-Brutalist */
+:root{
+  --bg:#f7e733; --void:#0d0d0d;
+  --fg:#0d0d0d; --fg2:#26261c; --fg3:#4a4a2e; --fg4:#6b6b52;
+  --acc:#e5195f; --ok:#0a8f63;
+  --line:#0d0d0d; --line2:rgba(13,13,13,.22);
+  --card-bd:.45cqw solid #0d0d0d; --card-bg:#fffdf2;
+  --code-bg:#0d0d0d; --acc-bg:#fffdf2; --ok-bg:#fffdf2;
+  --panel:#fffdf2; --radius:0; --shadow:.9cqw .9cqw 0 #0d0d0d;
+  --mono:"JetBrains Mono",ui-monospace,monospace;
+  --sans:"Noto Sans TC","Space Grotesk",sans-serif;
+  --h1-shadow:none;
+  --label-font:"Space Grotesk","Noto Sans TC",sans-serif; --label-ls:.16em;
+}
+/* 標籤做成黑色色塊 */
+.eyebrow{font-family:var(--label-font);font-weight:700;background:#0d0d0d;color:#f7e733;
+  align-self:flex-start;padding:.7cqw 1.5cqw;letter-spacing:.16em;text-transform:uppercase;
+  box-shadow:.65cqw .65cqw 0 var(--acc);font-size:1.3cqw}
+.eyebrow b{color:#f7e733}
+.eyebrow.plain{background:none;color:var(--fg3);box-shadow:none;padding:0;text-transform:none;letter-spacing:.14em}
+.eyebrow.plain b{color:var(--fg)}
+/* 標題的螢光標記 */
+mark{background:var(--acc);color:#fff;padding:0 1cqw;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.h1,.h2,.h3{font-weight:900}
+/* 程式碼是黑底，配色要獨立一套 */
+.code{color:#efeee2;box-shadow:var(--shadow)}
+.code .c{color:#8f8f7d}
+.code .k{color:#ff7aa8}
+.code .s{color:#3fe0c0}
+.code .f{color:#f7e733}
+.code .hl{background:rgba(229,25,95,.28)}
+/* 提示框＝白卡片＋粗左邊 */
+.callout{border:var(--card-bd);border-left-width:1.5cqw;border-left-color:var(--acc);box-shadow:.8cqw .8cqw 0 #0d0d0d;color:var(--fg2)}
+.callout.ok{border-left-color:var(--ok)}
+.bullets li::before{content:"■";font-size:.72em;top:.22em}
+/* 表格在黃底上，表頭用黑字配粉紅底線 */
+.tbl th{color:#0d0d0d;border-bottom:.3cqw solid var(--acc)}
+.tbl td{border-bottom:.14cqw solid var(--line2)}
+.big{color:#0d0d0d;font-family:var(--label-font);font-weight:700}
+.tree{color:var(--fg2)}.tree b{color:#0d0d0d}.tree i{color:var(--fg4)}
+/* 深色覆蓋層上的文字要翻轉，否則深色底配深色字會看不見 */
+.ov{background:rgba(13,13,13,.96)}
+.ov h5{color:var(--acc)}
+#toc li{color:#e6e5d6}#toc li b{color:#6b6b52}#toc li:hover{color:#f7e733}#toc li.cur{color:#ff7aa8}
+#help dl{color:#e6e5d6}#help dt{color:#f7e733}
+#note{color:var(--fg2);border-top:.4cqw solid #0d0d0d}
+#note::before{color:var(--fg4)}
+#cnt,#tag{color:var(--fg3)}
+</style>
+</head>
+<body>
+<div id="stage">
+<div id="fx"></div>
+<!-- ══════════ 開場 ══════════ -->
+<section class="slide cover" data-tag="PART 3" data-note="最後一段。氣氛可以輕鬆一點，但核心訊息要很硬：AI 不是讓你不用學，是讓懂的人變快。">
+  <div class="pad">
+    <div class="eyebrow" data-r>PART 3 — AI</div>
+    <h1 class="h1" data-r>用 AI<br>再做<mark>一次</mark></h1>
+    <p class="lead" data-r style="margin-top:2cqw">同樣的成果，這次用提示詞。然後讓它幫你測試。</p>
+    <div class="eyebrow plain mt" data-r style="display:flex;gap:3cqw;margin-top:4cqw">
+      <span>TOPIC 05 · 06</span><span>110 MIN</span><span>2026.09.19</span>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-tag="PART 3" data-note="這頁是整個下半場的論點。講慢一點。如果今天只有一句話被記住，應該是這句。">
+  <div class="pad ctr">
+    <div class="eyebrow" data-r>核心主張</div>
+    <h2 class="h2" data-r style="margin-top:2.4cqw">AI 不會讓你不用懂。<br>它讓<mark>懂的人</mark>快十倍。</h2>
+    <div class="grid g2" data-r style="margin-top:3cqw">
+      <div class="card"><b>不懂的人用 AI</b><strong>拿到一坨會動的程式碼</strong><span>不知道對不對、不知道安不安全、一改就壞、出錯只能重問。</span></div>
+      <div class="card"><b>懂的人用 AI</b><strong>拿到一份初稿</strong><span>看得懂、挑得出問題、知道該補什麼、能精準描述下一步。</span></div>
+    </div>
+    <div class="callout" data-r><b>上午那 90 分鐘，就是為了讓你站在右邊這一欄。</b></div>
+  </div>
+</section>
+
+<!-- ══════════ 主題 05 ══════════ -->
+<section class="slide chapter" data-tag="TOPIC 05" data-note="章節頁。接下來要一步步把上午的步驟用提示詞重做。">
+  <div class="pad">
+    <div class="big" data-r>05</div>
+    <h2 class="h2" data-r>用 AI 一步步做出同樣的成果</h2>
+    <p class="lead" data-r>把上午的每個 Step，改寫成一段提示詞。</p>
+    <div class="eyebrow plain mt" data-r>PART 3 · 70 MIN</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 05" data-note="提示詞骨架是這節最實用的東西。請他們抄下這四個欄位，之後所有的提問都套這個模板。">
+  <div class="pad">
+    <div class="eyebrow" data-r>模板</div>
+    <h3 class="h3" data-r style="margin-top:1.6cqw">一段好提示詞的四個部分</h3>
+    <div class="grid g4" data-r>
+      <div class="card"><b>01 角色</b><strong>你是誰</strong><span>「你是資深 Python 後端工程師」<br><br>決定它用什麼水準、什麼慣例回答你</span></div>
+      <div class="card"><b>02 目標</b><strong>要什麼</strong><span>「寫一支登入 API」<br><br>一次一個目標，不要包裹三件事</span></div>
+      <div class="card"><b>03 限制</b><strong>不要什麼</strong><span>「不要用 JWT」「先不接資料庫」<br><br>這一欄最常被省略，也最關鍵</span></div>
+      <div class="card"><b>04 輸出</b><strong>長什麼樣</strong><span>「完整的 main.py 加啟動指令」<br><br>講清楚你要拿到什麼形式</span></div>
+    </div>
+    <div class="callout" data-r><b>少了第 03 欄，你會拿到一個「很厲害但你看不懂」的版本。</b></div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 05" data-note="左右對照。請他們猜左邊那句會得到什麼 —— 通常會得到一個包含資料庫、JWT、Docker 的龐大專案，完全無法消化。">
+  <div class="pad">
+    <div class="eyebrow" data-r>對照</div>
+    <h3 class="h3" data-r style="margin-top:1.6cqw">同一個需求，兩種問法</h3>
+    <div class="grid g2" data-r>
+      <div class="card"><b>❌ 你會拿到災難</b><strong>「幫我做一個登入系統」</strong><span>它會給你：JWT、SQLAlchemy、Alembic、Docker、OAuth2……一個你完全看不懂也跑不起來的專案。<br><br>然後你連從哪裡開始除錯都不知道。</span></div>
+      <div class="card"><b>✓ 你會拿到能用的</b><strong>「用 FastAPI 寫一支 POST /api/login，輸入 username 和 password，成功回 token，失敗回 401，資料先用 dict 假資料，不要用 JWT」</strong><span>它會給你一個你看得懂、跑得動、改得動的版本。</span></div>
+    </div>
+    <div class="callout" data-r><b>差別不在 AI 有多強，在你把需求講得多清楚。</b>這件事跟你將來帶人做專案一模一樣。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 05" data-note="這兩條鐵則貫穿整節。第二條特別重要 —— 上午我們花時間寫「規格」那頁，就是在為這一刻做準備。">
+  <div class="pad">
+    <div class="eyebrow" data-r>兩條鐵則</div>
+    <h3 class="h3" data-r style="margin-top:1.6cqw">用 AI 寫程式的紀律</h3>
+    <div class="grid g2" data-r>
+      <div class="card"><b>鐵則一</b><strong>一次只要一步</strong><span>寫一支 API → 跑起來 → 確認對 → 再問下一步。<br><br>一次要五個功能，五個都有小問題，你會分不清是哪裡壞的。</span></div>
+      <div class="card"><b>鐵則二</b><strong>給規格，不要給願望</strong><span>「做個好用的登入」是願望。<br>「POST /api/login，成功 200 回 token，失敗 401」是規格。<br><br>上午寫過規格表，現在直接貼給它。</span></div>
+    </div>
+    <div class="callout ok" data-r><b>注意到了嗎？</b>你上午學的每一件事，現在都變成了跟 AI 溝通的詞彙。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="STEP 1-2" data-note="第一個實際示範。現場打開 AI 工具，真的把這段貼進去，讓他們看產出。不要用預錄的畫面。">
+  <div class="pad">
+    <div class="eyebrow" data-r>重做 Step 1</div>
+    <h3 class="h3" data-r style="margin-top:1.4cqw">第一個伺服器</h3>
+    <div class="code sm" data-r>你是 Python 教學者，對象是第一次寫後端的大學生。
+
+目標：用 Python 標準函式庫（不要裝任何套件）寫一個
+最簡單的 HTTP 伺服器，聽在 127.0.0.1:8000，
+任何 GET 請求都回傳純文字「我是伺服器」。
+
+限制：
+- 不要用 Flask 或 FastAPI
+- 程式碼不超過 15 行
+- 每一行都要有繁體中文註解，解釋它在做什麼
+
+輸出：完整可執行的 main.py，以及啟動指令。</div>
+    <div class="callout" data-r><b>對照一下：</b>它給你的，跟你上午手寫的那 12 行，幾乎一樣。<span class="hot">因為你上午就是對的。</span></div>
+  </div>
+</section>
+
+<section class="slide" data-tag="STEP 5" data-note="這是最完整的提示詞範例，請他們拍照。特別指出「限制」那四行 —— 沒有它們，產出會完全不一樣。">
+  <div class="pad">
+    <div class="eyebrow" data-r>重做 Step 5</div>
+    <h3 class="h3" data-r style="margin-top:1.2cqw">登入 API 的完整提示詞</h3>
+    <div class="code xs" data-r>你是資深 Python 後端工程師。
+
+目標：用 FastAPI 寫一支登入 API。
+
+規格：
+- POST /api/login
+- 輸入 JSON：username、password
+- 成功回 200，body 是 {"token": "隨機字串"}
+- 失敗回 401，detail 是「帳號或密碼錯誤」
+- 帳號不存在和密碼錯誤，都回同一個訊息
+- token 用 secrets.token_hex(16) 產生，存在記憶體的 dict
+
+限制：
+- 只寫這一支 API，不要順便加別的功能
+- 不要用 JWT、不要接資料庫，我還沒學
+- 不要寫 try/except 包住全部
+- 每段加繁體中文註解
+
+輸出：完整的 main.py，以及測試用的 curl 指令。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 05" data-note="並排比較是這節的高潮。重點不是誰比較好，是「你看得懂它、也挑得出它的問題」。">
+  <div class="pad">
+    <div class="eyebrow" data-r>並排比較</div>
+    <h3 class="h3" data-r style="margin-top:1.6cqw">手寫版 vs AI 版</h3>
+    <table class="tbl" data-r>
+      <tr><th></th><th>你上午手寫的</th><th>AI 三十秒生的</th></tr>
+      <tr><td>正確性</td><td>能跑，你知道為什麼能跑</td><td>通常能跑</td></tr>
+      <tr><td>速度</td><td>90 分鐘</td><td>30 秒</td></tr>
+      <tr><td>你懂多少</td><td><span class="hot">100%</span></td><td>取決於你上午有沒有認真</td></tr>
+      <tr><td>出錯時</td><td>知道去哪裡找</td><td>只能再問一次，或看得懂自己修</td></tr>
+      <tr><td>面試被問</td><td>講得出設計理由</td><td>答不出來就結束了</td></tr>
+    </table>
+    <div class="callout" data-r><b>結論不是「不要用 AI」。</b>是「先讓自己有能力驗收，再全速使用」。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 05" data-note="回報錯誤的方式決定了你能不能被救。很多人只貼一句「不能跑」，然後怪 AI 不好用。">
+  <div class="pad">
+    <div class="eyebrow" data-r>當它寫錯時</div>
+    <h3 class="h3" data-r style="margin-top:1.4cqw">怎麼回報錯誤</h3>
+    <div class="grid g2" data-r>
+      <div class="card"><b>❌ 沒救的問法</b><strong>「不能跑」<br>「有錯誤」<br>「還是不行」</strong><span>它只能用猜的，然後給你另一個猜測。你們會來回五次都修不好。</span></div>
+      <div class="card"><b>✓ 一次就解決</b><strong>四樣東西一起給</strong><span>① 你執行的完整指令<br>② 完整的錯誤訊息（含 Traceback）<br>③ 你的環境（Python 版本、作業系統）<br>④ 你期待的結果</span></div>
+    </div>
+    <div class="callout" data-r><b>加一句非常有效的話：</b>「請先說明這個錯誤的原因，再給修正後的程式碼。」<span class="hot">先解釋，你才學得到東西。</span></div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 05" data-note="三個必問。這是把 AI 產出變成自己知識的方法，也是驗收的最低標準。請他們今天之後每次都問。">
+  <div class="pad">
+    <div class="eyebrow" data-r>貼上之前</div>
+    <h3 class="h3" data-r style="margin-top:1.4cqw">先問自己三個問題</h3>
+    <ul class="bullets" data-r>
+      <li>這段程式碼，哪一行在做驗證？<span>指得出來，代表你看懂了流程；指不出來，先問 AI 逐行解釋</span></li>
+      <li>如果使用者送出空密碼、超長字串，會發生什麼事？<span>AI 很常忽略邊界情況 —— 這是它最典型的疏漏</span></li>
+      <li>它有沒有回傳不該回傳的東西？<span>密碼、內部錯誤訊息、其他人的資料，都是常見的外洩來源</span></li>
+    </ul>
+    <div class="callout" data-r><b>三題都答得出來，才按下貼上。</b>這個習慣會跟著你整個職涯。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 05" data-note="AI 的四個典型坑。第一個「幻覺套件」要特別講 —— 它會發明不存在的函式庫名稱，而且講得非常有自信。">
+  <div class="pad">
+    <div class="eyebrow" data-r>已知地雷</div>
+    <h3 class="h3" data-r style="margin-top:1.4cqw">AI 最常出的四種錯</h3>
+    <div class="grid g2" data-r>
+      <div class="card"><b>01 幻覺</b><strong>發明不存在的東西</strong><span>套件名、函式名、參數，講得非常有自信但根本沒有。<br>驗證：直接去官方文件搜尋。</span></div>
+      <div class="card"><b>02 過時</b><strong>用的是三年前的寫法</strong><span>能跑，但已經被官方標記淘汰。<br>驗證：問「這是目前的建議寫法嗎？」</span></div>
+      <div class="card"><b>03 不安全的預設</b><strong>圖方便的設定</strong><span>allow_origins=["*"]、密碼明文存、debug 模式開著上線。</span></div>
+      <div class="card"><b>04 過度設計</b><strong>給你用不到的複雜度</strong><span>你只要一支 API，它給你一套架構。看不懂就是不能用。</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 05" data-note="練習時間。讓他們自己動手，不要只看示範。走動巡堂，看誰的提示詞寫得含糊。">
+  <div class="pad">
+    <div class="eyebrow" data-r>換你做</div>
+    <h3 class="h3" data-r style="margin-top:1.4cqw">練習：加一支新的 API</h3>
+    <div class="grid g2" data-r>
+      <div>
+        <div class="eyebrow plain" style="margin-bottom:1.2cqw">任務</div>
+        <ul class="bullets tight" style="margin-top:0">
+          <li>新增 <span class="hot">POST /api/profile</span><span>讓登入者可以修改自己的 dept 欄位</span></li>
+          <li>必須帶 token 才能改<span>沒帶或無效就回 401</span></li>
+          <li>不能改別人的資料<span>只能改 token 對應到的那個人</span></li>
+        </ul>
+      </div>
+      <div>
+        <div class="eyebrow plain" style="margin-bottom:1.2cqw">評分標準</div>
+        <ul class="bullets tight" style="margin-top:0">
+          <li>用四段式骨架寫提示詞</li>
+          <li>產出後能指出哪一行在驗證 token</li>
+          <li>自己測過沒帶 token 的情況</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout" data-r><b>進階挑戰：</b>故意寫一段含糊的提示詞，看它給你什麼 —— 然後把它改精確，比較兩次的差別。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 05" data-note="小抄頁，請他們拍照。這是這節最容易帶走的東西。">
+  <div class="pad">
+    <div class="eyebrow" data-r>帶走</div>
+    <h3 class="h3" data-r style="margin-top:1.4cqw">提示詞小抄</h3>
+    <div class="code xs" data-r>【角色】你是 ________ 工程師，對象是 ________。
+
+【目標】________（一次只講一件事）
+
+【規格】
+- 路徑 / 輸入 / 成功回什麼 / 失敗回什麼
+
+【限制】
+- 不要用 ________（我還沒學）
+- 只做這一件事，不要順便加功能
+- 加繁體中文註解
+
+【輸出】完整檔案 + 執行指令 + 測試方式
+
+── 出錯時 ──────────────────────────
+我執行了：________
+完整錯誤訊息：________
+環境：________
+請先說明原因，再給修正後的程式碼。</div>
+  </div>
+</section>
+
+<!-- ══════════ 主題 06 ══════════ -->
+<section class="slide chapter" data-tag="TOPIC 06" data-note="最後一個主題。測試通常是學生最沒興趣的部分 —— 用「AI 幫你寫」當誘因，把它變成最輕鬆的一節。">
+  <div class="pad">
+    <div class="big" data-r>06</div>
+    <h2 class="h2" data-r>用 AI 進行測試</h2>
+    <p class="lead" data-r>最無聊的工作，剛好是 AI 最擅長的。</p>
+    <div class="eyebrow plain mt" data-r>PART 3 · 30 MIN</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 06" data-note="用他們剛剛的經驗切入：上午改 CORS 的時候，有沒有人不小心把登入弄壞了？沒有測試，你不會知道。">
+  <div class="pad">
+    <div class="eyebrow" data-r>為什麼</div>
+    <h3 class="h3" data-r style="margin-top:1.6cqw">沒有測試的專案，改一行就要全部重試</h3>
+    <div class="grid g2" data-r>
+      <div class="card"><b>沒有測試</b><strong>每次改動都要手動點一遍</strong><span>開瀏覽器 → 登入 → 看畫面 → 登出 → 試錯密碼……<br><br>改五次就點五遍。所以大家最後都不點了，然後上線才爆炸。</span></div>
+      <div class="card"><b>有測試</b><strong>一行指令，兩秒知道</strong><span>pytest<br><br>七個情境全部自動跑一遍，哪個壞了直接告訴你。</span></div>
+    </div>
+    <div class="callout" data-r><b>測試不是為了證明程式對，</b>是為了讓你<span class="hot">敢改</span>。這跟上午 Git 分支的道理完全一樣。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 06" data-note="三層只要知道概念，今天只做中間那層（API 測試），因為投報率最高。">
+  <div class="pad">
+    <div class="eyebrow" data-r>分類</div>
+    <h3 class="h3" data-r style="margin-top:1.6cqw">測試的三個層次</h3>
+    <div class="flow" data-r>
+      <div class="st"><b>UNIT</b><strong>單元測試</strong><span>測一個函式<br>快、多、便宜</span></div>
+      <div class="ar">▶</div>
+      <div class="st"><b>API</b><strong>介面測試</strong><span>測一支 API 的輸入輸出<br><br>今天做這層</span></div>
+      <div class="ar">▶</div>
+      <div class="st"><b>E2E</b><strong>端對端測試</strong><span>模擬真人操作瀏覽器<br>慢、貴、但最接近真實</span></div>
+    </div>
+    <div class="callout" data-r><b>為什麼選中間？</b>對後端來說，API 測試的投報率最高 —— 一個測試就涵蓋了路由、驗證、邏輯、回應格式。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 06" data-note="這是這節最重要的一頁。注意提示詞裡「列出你想到但我沒列到的案例」那一行 —— 那是把 AI 當同事而不是打字機的關鍵。">
+  <div class="pad">
+    <div class="eyebrow" data-r>提示詞</div>
+    <h3 class="h3" data-r style="margin-top:1.2cqw">叫 AI 寫測試</h3>
+    <div class="code xs" data-r>你是熟悉 pytest 的 Python 測試工程師。
+
+目標：為下面這支 /api/login 寫 pytest 測試。
+（把你的 main.py 貼上來）
+
+請涵蓋這些情境：
+- 帳號密碼正確 → 200 且回應有 token
+- 密碼錯誤 → 401
+- 帳號不存在 → 401
+- 缺少 password 欄位 → 422
+- username 是空字串
+- password 是 1000 個字元的超長字串
+- username 傳入 SQL 注入字串 ' OR '1'='1
+
+限制：
+- 用 fastapi.testclient.TestClient
+- 一個情境一個測試函式，函式名要看得懂
+- 每個測試加繁體中文註解說明在測什麼
+
+最後：請另外列出你想到、但我沒列到的測試案例。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 06" data-note="pytest 的結構要教，否則他們看不懂 AI 給的東西。重點是 assert 這個字 —— 「主張」，不成立就失敗。">
+  <div class="pad">
+    <div class="eyebrow" data-r>看懂它</div>
+    <h3 class="h3" data-r style="margin-top:1.4cqw">pytest 的長相</h3>
+    <div class="code xs" data-r><span class="k">from</span> fastapi.testclient <span class="k">import</span> TestClient
+<span class="k">from</span> main <span class="k">import</span> app
+
+client = TestClient(app)          <span class="c"># 一個假的瀏覽器，不用真的開伺服器</span>
+
+<span class="k">def</span> <span class="f">test_login_success</span>():          <span class="c"># 函式名一定要 test_ 開頭</span>
+    <span class="c">"""正確的帳號密碼應該拿到 token"""</span>
+    r = client.post(<span class="s">"/api/login"</span>, json={<span class="s">"username"</span>: <span class="s">"jase"</span>, <span class="s">"password"</span>: <span class="s">"1234"</span>})
+    <span class="k">assert</span> r.status_code == <span class="s">200</span>       <span class="c"># assert = 我主張……</span>
+    <span class="k">assert</span> <span class="s">"token"</span> <span class="k">in</span> r.json()        <span class="c"># 不成立就算這個測試失敗</span>
+
+<span class="k">def</span> <span class="f">test_login_wrong_password</span>():
+    <span class="c">"""密碼錯誤應該被擋下來"""</span>
+    r = client.post(<span class="s">"/api/login"</span>, json={<span class="s">"username"</span>: <span class="s">"jase"</span>, <span class="s">"password"</span>: <span class="s">"xxxx"</span>})
+    <span class="k">assert</span> r.status_code == <span class="s">401</span></div>
+    <div class="callout" data-r><b>執行：</b><span class="hot">pip install pytest</span> 然後 <span class="hot">pytest -v</span>。綠色是通過，紅色是失敗。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 06" data-note="這頁是重點：AI 通常會補出你沒想到的案例。現場念一遍它多列出來的，學生會很有感 —— 原來測試要想這麼多。">
+  <div class="pad">
+    <div class="eyebrow" data-r>驚喜</div>
+    <h3 class="h3" data-r style="margin-top:1.4cqw">AI 想到的，通常比你多</h3>
+    <div class="grid g2" data-r>
+      <div>
+        <div class="eyebrow plain" style="margin-bottom:1.2cqw">你會想到的</div>
+        <ul class="bullets tight" style="margin-top:0">
+          <li>帳號密碼對</li>
+          <li>密碼錯</li>
+          <li>帳號不存在</li>
+        </ul>
+      </div>
+      <div>
+        <div class="eyebrow plain" style="margin-bottom:1.2cqw">它還會補上的</div>
+        <ul class="bullets tight" style="margin-top:0">
+          <li>大小寫不同的帳號算同一個嗎</li>
+          <li>前後有空白的帳號</li>
+          <li>Unicode、表情符號當密碼</li>
+          <li>同一組帳密連續登入，token 會不會重複</li>
+          <li>錯誤訊息有沒有洩漏「帳號存在」</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout" data-r><b>這就是 AI 在測試上的真正價值：</b>它不會累，也沒有「應該不會有人這樣用」的盲點。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 06" data-note="一定要讓測試真的失敗一次。故意把 401 改成 403，跑一次看紅字，再改回來。看過失敗長什麼樣，他們才不會怕。">
+  <div class="pad">
+    <div class="eyebrow" data-r>紅燈</div>
+    <h3 class="h3" data-r style="margin-top:1.4cqw">看懂失敗訊息</h3>
+    <div class="code sm" data-r>FAILED test_main.py::test_login_wrong_password
+
+    <span class="k">def</span> test_login_wrong_password():
+        r = client.post(<span class="s">"/api/login"</span>, json={...})
+&gt;       <span class="k">assert</span> r.status_code == <span class="s">401</span>
+E       <span class="k">assert 403 == 401</span>
+E        +  where 403 = &lt;Response [403]&gt;.status_code
+
+<span class="c">══ 1 failed, 6 passed in 0.42s ══</span></div>
+    <ul class="bullets tight" data-r style="margin-top:1.6cqw">
+      <li>哪個測試失敗了：<span class="hot">test_login_wrong_password</span></li>
+      <li>期待什麼、實際拿到什麼：<span class="hot">期待 401，實際 403</span></li>
+      <li>其他六個還是綠的 —— 所以問題被縮小到一個地方了</li>
+    </ul>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 06" data-note="修 bug 的流程。強調第 1 步：先讓測試重現問題。這是專業與業餘的分界線。">
+  <div class="pad">
+    <div class="eyebrow" data-r>流程</div>
+    <h3 class="h3" data-r style="margin-top:1.6cqw">請 AI 修 bug 的正確順序</h3>
+    <div class="flow" data-r>
+      <div class="st"><b>01</b><strong>先寫測試</strong><span>讓失敗可以被重現</span></div>
+      <div class="ar">▶</div>
+      <div class="st"><b>02</b><strong>貼完整訊息</strong><span>測試碼＋失敗輸出＋相關程式碼</span></div>
+      <div class="ar">▶</div>
+      <div class="st"><b>03</b><strong>要它先解釋</strong><span>「為什麼會 403」</span></div>
+      <div class="ar">▶</div>
+      <div class="st"><b>04</b><strong>再跑一次</strong><span>綠了才算修好</span></div>
+    </div>
+    <div class="callout" data-r><b>沒有第 01 步，你永遠不知道它到底修好了沒。</b>「看起來好了」不是驗收標準，測試變綠才是。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 06" data-note="覆蓋率要講，但更要講它的陷阱 —— 100% 覆蓋率不等於沒 bug。這是給比較強的學生的。">
+  <div class="pad">
+    <div class="eyebrow" data-r>數字的陷阱</div>
+    <h3 class="h3" data-r style="margin-top:1.6cqw">測試覆蓋率</h3>
+    <div class="grid g2" data-r>
+      <div class="card"><b>它告訴你什麼</b><strong>哪幾行從來沒被跑過</strong><span>pytest --cov 會列出沒被測試碰到的行數。<br><br>那些地方是你的盲區。</span></div>
+      <div class="card"><b>它不告訴你什麼</b><strong>跑過 ≠ 測對了</strong><span>每一行都跑過，但你只檢查了「有回應」沒檢查「回應正確」—— 覆蓋率一樣是 100%。</span></div>
+    </div>
+    <div class="callout" data-r><b>把它當地圖，不要當成績。</b>覆蓋率低一定有問題，覆蓋率高不代表沒問題。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 06" data-note="把 Git 接回來，讓一整天形成閉環。測試也是程式碼，也要進版控。">
+  <div class="pad">
+    <div class="eyebrow" data-r>閉環</div>
+    <h3 class="h3" data-r style="margin-top:1.6cqw">測試寫完，記得 commit</h3>
+    <div class="code" data-r><span class="f">pytest</span> -v                       <span class="c"># 先確認全綠</span>
+
+<span class="f">git</span> add test_main.py
+<span class="f">git</span> commit -m <span class="s">"新增登入 API 的測試，涵蓋七種情境"</span>
+<span class="f">git</span> push</div>
+    <div class="callout ok" data-r><b>現在你的專案有了完整的一圈：</b>版本控制 → 後端程式 → 部署上線 → 自動測試。<span class="hot">這就是一個真實專案的骨架。</span></div>
+  </div>
+</section>
+
+<!-- ══════════ 收尾 ══════════ -->
+<section class="slide" data-tag="CLOSING" data-note="回顧地圖。一頁把六小時走完，讓他們感覺到自己今天真的移動了很遠。">
+  <div class="pad">
+    <div class="eyebrow" data-r>六小時</div>
+    <h3 class="h3" data-r style="margin-top:1.4cqw">你今天走過的路</h3>
+    <div class="grid g3" data-r>
+      <div class="card"><b>PART 1</b><strong>基礎</strong><span>看懂三層式架構與一個請求的完整旅程<br><br>用 Git 管理專案，並用 Git Graph 看懂歷史</span></div>
+      <div class="card"><b>PART 2</b><strong>開發</strong><span>手寫三支 API、完成登入到個人資料的流程<br><br>踩過 CORS、401、422，並把網站發佈上線</span></div>
+      <div class="card"><b>PART 3</b><strong>AI</strong><span>用四段式提示詞重做同樣的成果<br><br>讓 AI 產生七種情境的測試並修好 bug</span></div>
+    </div>
+    <div class="callout" data-r><b>早上你只有一個空資料夾。</b>現在你有一個上線中的網站、一份版本紀錄、一組會自動跑的測試。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="CLOSING" data-note="路線圖。給他們明確的下一步，不要只說「繼續加油」。可以問誰想做專題，推薦第一個方向。">
+  <div class="pad">
+    <div class="eyebrow" data-r>接下來</div>
+    <h3 class="h3" data-r style="margin-top:1.4cqw">下一步學什麼</h3>
+    <table class="tbl" data-r>
+      <tr><th>順序</th><th>主題</th><th>為什麼是現在</th></tr>
+      <tr><td>1</td><td>資料庫與 SQL</td><td>今天用 dict 假裝的那塊，是真實系統的核心</td></tr>
+      <tr><td>2</td><td>密碼雜湊與 JWT</td><td>今天的 token 是簡化版，正式專案不能這樣寫</td></tr>
+      <tr><td>3</td><td>前端框架（React / Vue）</td><td>原生 JS 夠用，但畫面一複雜就會想要它</td></tr>
+      <tr><td>4</td><td>Docker</td><td>解決「在我電腦上明明可以跑」的終極方案</td></tr>
+    </table>
+    <div class="callout" data-r><b>建議做法：</b>把今天的 MiniProfile 繼續長大，不要每次都開新專案。一個專案做到第四項，勝過四個半成品。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="CLOSING" data-note="資源頁。停久一點讓他們拍照。">
+  <div class="pad">
+    <div class="eyebrow" data-r>帶走</div>
+    <h3 class="h3" data-r style="margin-top:1.4cqw">資源與練習</h3>
+    <div class="grid g2" data-r>
+      <div>
+        <div class="eyebrow plain" style="margin-bottom:1.2cqw">官方文件（優先看這些）</div>
+        <ul class="bullets tight" style="margin-top:0">
+          <li>FastAPI 官方教學<span>fastapi.tiangolo.com — 有完整中文翻譯</span></li>
+          <li>MDN Web Docs<span>developer.mozilla.org — HTTP、fetch 的權威來源</span></li>
+          <li>Pro Git（免費電子書）<span>git-scm.com/book/zh-tw</span></li>
+        </ul>
+      </div>
+      <div>
+        <div class="eyebrow plain" style="margin-bottom:1.2cqw">課後練習（擇一完成）</div>
+        <ul class="bullets tight" style="margin-top:0">
+          <li>把假資料換成 SQLite</li>
+          <li>加上註冊功能與密碼雜湊</li>
+          <li>讓個人資料頁可以編輯並存回去</li>
+          <li>把測試補到十個情境以上</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-tag="CLOSING" data-note="最後一頁。留 Q&A 時間。可以留聯絡方式，也鼓勵他們把做出來的網址貼出來互相看。">
+  <div class="pad ctr">
+    <div class="eyebrow" data-r>END</div>
+    <h2 class="h2" data-r style="margin-top:2.4cqw">你已經<mark>寫過</mark>後端了。</h2>
+    <p class="lead" data-r style="margin-top:2.4cqw">今天最重要的不是那三支 API，是你現在有能力判斷一段後端程式碼是好是壞 —— 不管它是誰寫的。</p>
+    <div class="callout ok" data-r style="margin-top:3cqw"><b>謝謝大家。</b>現在是提問時間 —— 任何問題都可以，包含今天沒講到的。</div>
+  </div>
+</section>
+
+<!-- ══════════ UI ══════════ -->
+<div class="zone l" id="zl"></div>
+<div class="zone r" id="zr"></div>
+<div id="tag"></div>
+<div id="cnt"></div>
+<div id="bar"></div>
+<div class="ov" id="toc"><h5>目錄 — 點擊跳頁</h5></div>
+<div class="ov" id="help"><h5>鍵盤操作</h5>
+  <dl>
+    <dt>→ / ↓ / Space</dt><dd>下一頁</dd>
+    <dt>← / ↑</dt><dd>上一頁</dd>
+    <dt>Home / End</dt><dd>第一頁 / 最後一頁</dd>
+    <dt>O</dt><dd>目錄（可點擊跳頁）</dd>
+    <dt>N</dt><dd>講者備註</dd>
+    <dt>F</dt><dd>全螢幕</dd>
+    <dt>E</dt><dd>編輯模式：直接改文字、插入圖片、調整區塊與頁面順序，改完匯出 HTML</dd>
+    <dt>?</dt><dd>這張說明</dd>
+    <dt>Esc</dt><dd>關閉覆蓋層</dd>
+  </dl>
+</div>
+<div id="note"></div>
+<button id="ebtn" type="button" title="編輯模式（E）">✎</button>
+<div id="bstrip" hidden>
+  <button type="button" data-act="parent" title="選取外層區塊">↖</button>
+  <button type="button" data-act="up" title="往上移">↑</button>
+  <button type="button" data-act="down" title="往下移">↓</button>
+  <button type="button" data-act="alignL" class="img-only" title="靠左">◧</button>
+  <button type="button" data-act="alignC" class="img-only" title="置中">▣</button>
+  <button type="button" data-act="alignR" class="img-only" title="靠右">◨</button>
+  <button type="button" data-act="free" class="img-only" title="自由放置：可拖曳到投影片任何位置；再按一次回到排版流">自由</button>
+  <button type="button" data-act="del" title="刪除這個區塊">✕</button>
+</div>
+<div id="bhandle" hidden title="拖曳縮放"></div>
+<div id="dbanner" hidden><span>偵測到上次未匯出的編輯</span><button type="button" id="drestore">還原</button><button type="button" id="ddiscard">捨棄</button></div>
+<div id="toast" hidden></div>
+</div>
+<div id="etb" hidden>
+  <div class="g">
+    <button type="button" data-e="prev" title="上一頁（PageUp）">‹</button>
+    <span id="epos">1 / 1</span>
+    <button type="button" data-e="next" title="下一頁（PageDown）">›</button>
+    <button type="button" data-e="toc">目錄</button>
+    <button type="button" data-e="notes">備註</button>
+  </div>
+  <div class="g">
+    <label class="btn" title="插入圖片到目前這頁（也可以直接把圖片拖進來、或 Ctrl/Cmd+V 貼上）">＋ 圖片<input id="efile" type="file" accept="image/*" multiple hidden></label>
+    <button type="button" data-e="dup">複製此頁</button>
+    <button type="button" data-e="blank">新增空白頁</button>
+    <button type="button" data-e="mvL" title="這一頁往前移">頁 ◀</button>
+    <button type="button" data-e="mvR" title="這一頁往後移">頁 ▶</button>
+    <button type="button" data-e="delSlide" class="danger">刪除此頁</button>
+  </div>
+  <div class="g">
+    <button type="button" data-e="undo" title="復原上一個操作">↶ 復原</button>
+    <button type="button" data-e="revert" title="把這一頁還原成檔案原本的樣子">還原此頁</button>
+  </div>
+  <div class="g">
+    <button type="button" data-e="save" class="primary" title="匯出成 HTML 檔（Ctrl/Cmd + S）">💾 匯出 HTML</button>
+    <button type="button" data-e="exit">離開編輯</button>
+  </div>
+  <div class="hint">點文字直接修改（Enter 換行）· 點區塊出現 ↖↑↓✕ · 圖片：拖曳右下角縮放、按「自由」後可任意拖放 · 備註面板也可直接編輯 · 改完記得「匯出 HTML」並取代 slides/ 裡的同名檔案</div>
+</div>
+
+<script>
+(function(){
+  // 載入當下、任何 JS 改動之前的原始文件；匯出時以它為底，只替換投影片區
+  const PRISTINE=document.documentElement.outerHTML;
+  const stage=document.getElementById('stage');
+  const bar=document.getElementById('bar'), cnt=document.getElementById('cnt'), tag=document.getElementById('tag');
+  const note=document.getElementById('note'), toc=document.getElementById('toc'), help=document.getElementById('help');
+  let slides=[], N=0, cur=-1, ol=null, tocItems=[];
+
+  // ── 引擎 ─────────────────────────────────────────────────
+  function stagger(){ slides.forEach(s=>s.querySelectorAll('[data-r]').forEach((el,i)=>el.style.setProperty('--i',i))); }
+
+  function buildToc(){
+    if(ol) ol.remove();
+    ol=document.createElement('ol');
+    slides.forEach((s,i)=>{
+      const h=s.querySelector('.h1,.h2,.h3');
+      const li=document.createElement('li');
+      const b=document.createElement('b'); b.textContent=String(i+1).padStart(2,'0');
+      const t=document.createElement('span'); t.textContent=h?h.textContent.trim().replace(/\s+/g,' '):'—';
+      li.append(b,t);
+      li.addEventListener('click',()=>{go(i);closeAll();});
+      ol.appendChild(li);
+    });
+    toc.appendChild(ol); tocItems=[...ol.children];
+  }
+
+  // 自動配適：量出每頁內容的自然高度，超出就整頁等比縮小
+  function fitAll(){
+    const tight=[];
+    slides.forEach((s,i)=>{
+      const pad=s.querySelector('.pad');
+      pad.style.transform='';pad.style.width='';pad.style.height='';
+      pad.style.bottom='auto';pad.style.height='auto';
+      const need=pad.offsetHeight;
+      pad.style.bottom='';pad.style.height='';
+      const have=stage.clientHeight;
+      if(need>have+1){
+        const k=Math.max(.75,have/need);
+        pad.style.transformOrigin='top left';
+        pad.style.transform='scale('+k+')';
+        pad.style.width=(100/k)+'%';
+        pad.style.height=(100/k)+'%';
+        if(k<=.75) tight.push(i+1);
+      }
+    });
+    if(tight.length) console.warn('內容過多、已縮到下限的頁：',tight.join(', '));
+  }
+
+  function refresh(){
+    slides=[...stage.querySelectorAll('.slide')]; N=slides.length;
+    stagger(); buildToc(); fitAll();
+    if(editing) slides.forEach(s=>s.querySelector('.pad').setAttribute('contenteditable','true'));
+  }
+
+  function go(n,force){
+    n=Math.max(0,Math.min(N-1,n));
+    if(n===cur&&!force) return;
+    slides.forEach(s=>s.classList.remove('on'));
+    cur=n; slides[cur].classList.add('on');
+    bar.style.transform='scaleX('+((cur+1)/N)+')';
+    cnt.textContent=String(cur+1).padStart(2,'0')+' / '+N;
+    tag.textContent=slides[cur].dataset.tag||'';
+    note.textContent=slides[cur].dataset.note||(editing?'':'（這頁沒有備註）');
+    tocItems.forEach((li,i)=>li.classList.toggle('cur',i===cur));
+    history.replaceState(null,'','#'+(cur+1));
+    if(editing){ select(null); epos.textContent=(cur+1)+' / '+N; }
+  }
+  function closeAll(){toc.classList.remove('on');help.classList.remove('on');}
+  function toggle(el){const was=el.classList.contains('on');closeAll();if(!was)el.classList.add('on');}
+
+  document.addEventListener('keydown',e=>{
+    const k=e.key;
+    if(editing){
+      if((e.metaKey||e.ctrlKey)&&k.toLowerCase()==='s'){e.preventDefault();exportHTML();return;}
+      if(k==='Escape'){closeAll();select(null);return;}
+      if(k==='PageDown'){e.preventDefault();go(cur+1);}
+      else if(k==='PageUp'){e.preventDefault();go(cur-1);}
+      return;                                  // 其他按鍵交給文字編輯
+    }
+    if(k==='Escape'){closeAll();note.classList.remove('on');return;}
+    if(k==='ArrowRight'||k==='ArrowDown'||k==='PageDown'||k===' '){e.preventDefault();go(cur+1);}
+    else if(k==='ArrowLeft'||k==='ArrowUp'||k==='PageUp'){e.preventDefault();go(cur-1);}
+    else if(k==='Home'){go(0);}
+    else if(k==='End'){go(N-1);}
+    else if(k==='o'||k==='O'){toggle(toc);}
+    else if(k==='n'||k==='N'){note.classList.toggle('on');}
+    else if(k==='e'||k==='E'){setEditing(true);}
+    else if(k==='?'||k==='/'){toggle(help);}
+    else if(k==='f'||k==='F'){document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();}
+  });
+
+  document.getElementById('zl').addEventListener('click',()=>go(cur-1));
+  document.getElementById('zr').addEventListener('click',()=>go(cur+1));
+  [toc,help].forEach(o=>o.addEventListener('click',e=>{if(e.target===o)closeAll();}));
+
+  let tx=0;
+  stage.addEventListener('touchstart',e=>{tx=e.changedTouches[0].clientX;},{passive:true});
+  stage.addEventListener('touchend',e=>{
+    if(editing) return;
+    const d=e.changedTouches[0].clientX-tx;
+    if(Math.abs(d)>50) go(cur+(d<0?1:-1));
+  },{passive:true});
+
+  // ── 編輯模式 ─────────────────────────────────────────────
+  const etb=document.getElementById('etb'), ebtn=document.getElementById('ebtn');
+  const strip=document.getElementById('bstrip'), handle=document.getElementById('bhandle');
+  const epos=document.getElementById('epos'), efile=document.getElementById('efile');
+  const dbanner=document.getElementById('dbanner'), toastEl=document.getElementById('toast');
+  const FILE=(()=>{ try{ const n=decodeURIComponent(location.pathname.split('/').pop()||''); return /\.html?$/i.test(n)?n:(document.title.split('｜')[0].trim()||'slides')+'.html'; }catch(e){ return 'slides.html'; } })();
+  const DRAFT_KEY='deck-draft:'+FILE;
+  const BLOCK_SEL='.pad > *, .grid > *, .bullets > li';
+  let editing=false, sel=null, dirty=false, toastTimer, fitTimer, draftTimer;
+  const undo=[];                 // 每筆是一個「還原」函式
+  const original=new Map();      // section -> 進入編輯前的 innerHTML
+  let pristineDoc=null;
+
+  function toast(msg,ms){ toastEl.textContent=msg; toastEl.hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>toastEl.hidden=true,ms||2600); }
+
+  function setEditing(on){
+    if(on===editing) return;
+    editing=on;
+    document.body.classList.toggle('editing',on);
+    etb.hidden=!on;
+    slides.forEach(s=>{
+      const p=s.querySelector('.pad');
+      if(on){ if(!original.has(s)) original.set(s,s.innerHTML); p.setAttribute('contenteditable','true'); }
+      else p.removeAttribute('contenteditable');
+    });
+    if(on) note.setAttribute('contenteditable','true'); else note.removeAttribute('contenteditable');
+    select(null); closeAll();
+    if(cur>=0) go(cur,true);
+    setTimeout(()=>{fitAll();placeStrip();},0);
+    if(!on&&dirty) toast('還沒匯出。草稿已暫存在這個瀏覽器，下次打開會問你要不要還原。',4200);
+  }
+
+  // 區塊選取與浮動工具
+  function select(el){
+    if(sel) sel.classList.remove('sel');
+    sel=el&&el.isConnected?el:null;
+    if(sel) sel.classList.add('sel');
+    placeStrip();
+  }
+  function placeStrip(){
+    if(!editing||!sel||!sel.isConnected){ strip.hidden=true; handle.hidden=true; return; }
+    const r=sel.getBoundingClientRect(), s=stage.getBoundingClientRect();
+    strip.hidden=false;
+    strip.style.left=(r.right-s.left)+'px'; strip.style.top=(r.top-s.top)+'px';
+    strip.style.transform=(r.top-s.top)>s.width*.03?'translate(-100%,-100%)':'translate(-100%,0)';
+    const isImg=sel.classList.contains('img');
+    strip.classList.toggle('img',isImg);
+    strip.querySelector('[data-act=free]').classList.toggle('on',isImg&&sel.classList.contains('free'));
+    handle.hidden=!isImg;
+    if(isImg){ handle.style.left=(r.right-s.left)+'px'; handle.style.top=(r.bottom-s.top)+'px'; }
+  }
+  addEventListener('resize',placeStrip);
+
+  stage.addEventListener('mousedown',e=>{
+    if(!editing) return;
+    if(strip.contains(e.target)||handle.contains(e.target)||dbanner.contains(e.target)||e.target===ebtn) return;
+    const pad=e.target.closest('.slide.on .pad');
+    if(!pad){ select(null); return; }
+    const b=e.target.closest(BLOCK_SEL);
+    select(b&&pad.contains(b)?b:null);
+    if(b&&b.classList.contains('img')&&b.classList.contains('free')) startDrag(e,b);
+  });
+  strip.addEventListener('mousedown',e=>e.preventDefault());
+  strip.addEventListener('click',e=>{
+    const b=e.target.closest('button'); if(!b||!sel) return;
+    const act=b.dataset.act;
+    if(act==='parent'){ const p=sel.parentElement&&sel.parentElement.closest(BLOCK_SEL); if(p) select(p); return; }
+    snapshot();
+    if(act==='up'){ const p=sel.previousElementSibling; if(p) sel.parentNode.insertBefore(sel,p); }
+    else if(act==='down'){ const n=sel.nextElementSibling; if(n) sel.parentNode.insertBefore(n,sel); }
+    else if(act==='del'){ const s=sel; select(null); s.remove(); }
+    else if(act==='alignL'){ sel.classList.remove('c','r'); }
+    else if(act==='alignC'){ sel.classList.remove('r'); sel.classList.add('c'); }
+    else if(act==='alignR'){ sel.classList.remove('c'); sel.classList.add('r'); }
+    else if(act==='free'){ toggleFree(sel); }
+    changed();
+  });
+
+  // 文字編輯：Enter 換行（li 裡維持原生行為以便新增條列）、貼上只留純文字
+  stage.addEventListener('keydown',e=>{
+    if(!editing||e.key!=='Enter'||e.shiftKey) return;
+    const pad=e.target.closest&&e.target.closest('.pad'); if(!pad) return;
+    const selNode=getSelection().anchorNode, inLi=selNode&&(selNode.nodeType===1?selNode:selNode.parentElement).closest('li');
+    if(inLi) return;
+    e.preventDefault(); document.execCommand('insertLineBreak');
+  });
+  stage.addEventListener('input',e=>{
+    if(!editing) return;
+    if(e.target.closest&&e.target.closest('.pad')){ dirty=true; clearTimeout(fitTimer); fitTimer=setTimeout(()=>{fitAll();placeStrip();},500); saveDraftDebounced(); }
+  });
+  stage.addEventListener('paste',e=>{
+    if(!editing) return;
+    const files=[...((e.clipboardData&&e.clipboardData.files)||[])].filter(f=>f.type.startsWith('image/'));
+    if(files.length){ e.preventDefault(); files.forEach(insertImageFile); return; }
+    if(e.target.closest&&e.target.closest('.pad')){ e.preventDefault(); document.execCommand('insertText',false,e.clipboardData.getData('text/plain')); }
+  });
+  stage.addEventListener('dragover',e=>{ if(editing) e.preventDefault(); });
+  stage.addEventListener('drop',e=>{ if(!editing) return; e.preventDefault(); [...e.dataTransfer.files].filter(f=>f.type.startsWith('image/')).forEach(insertImageFile); });
+  stage.addEventListener('dragstart',e=>{ if(editing&&e.target.closest&&e.target.closest('.pad')) e.preventDefault(); });
+  note.addEventListener('input',()=>{ if(!editing||cur<0) return; slides[cur].dataset.note=note.textContent.trim(); dirty=true; saveDraftDebounced(); });
+
+  // 圖片
+  function insertImageFile(file){ shrink(file).then(insertImage); }
+  function shrink(file){
+    return new Promise(res=>{
+      const raw=()=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.readAsDataURL(file); };
+      if(/svg|gif/.test(file.type)) return raw();
+      const img=new Image(), u=URL.createObjectURL(file);
+      img.onload=()=>{
+        const MAX=1600, k=Math.min(1,MAX/Math.max(img.width,img.height));
+        const c=document.createElement('canvas'); c.width=Math.round(img.width*k); c.height=Math.round(img.height*k);
+        c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+        res(file.type==='image/png'?c.toDataURL('image/png'):c.toDataURL('image/jpeg',.86));
+        URL.revokeObjectURL(u);
+      };
+      img.onerror=raw; img.src=u;
+    });
+  }
+  function insertImage(dataUrl){
+    if(cur<0) return;
+    snapshot();
+    const fig=document.createElement('figure'); fig.className='img c'; fig.setAttribute('data-r',''); fig.style.width='55%';
+    const img=document.createElement('img'); img.src=dataUrl; img.alt=''; img.draggable=false; fig.appendChild(img);
+    const pad=slides[cur].querySelector('.pad');
+    let anchor=sel&&pad.contains(sel)?sel:null;
+    while(anchor&&anchor.parentElement!==pad) anchor=anchor.parentElement;
+    if(anchor) anchor.after(fig); else pad.appendChild(fig);
+    img.addEventListener('load',()=>{changed();select(fig);},{once:true});
+    changed(); select(fig);
+  }
+  function scaleOf(pad){ const m=/scale\(([\d.]+)\)/.exec(pad.style.transform||''); return m?+m[1]:1; }
+  function contentWidth(pad){ const cs=getComputedStyle(pad); return pad.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight); }
+  function toggleFree(fig){
+    const pad=fig.closest('.pad');
+    if(fig.classList.contains('free')){
+      fig.classList.remove('free'); fig.style.left=''; fig.style.top='';
+      fig.style.width=Math.min(100,parseFloat(fig.style.width)||55)+'%';
+    }else{
+      const r=fig.getBoundingClientRect(), p=pad.getBoundingClientRect(), k=scaleOf(pad);
+      fig.classList.add('free'); fig.classList.remove('c','r');
+      fig.style.left=((r.left-p.left)/k/pad.clientWidth*100).toFixed(2)+'%';
+      fig.style.top=((r.top-p.top)/k/pad.clientHeight*100).toFixed(2)+'%';
+      fig.style.width=(r.width/k/pad.clientWidth*100).toFixed(2)+'%';
+    }
+  }
+  function startDrag(e,fig){
+    e.preventDefault();
+    const pad=fig.closest('.pad'), k=scaleOf(pad);
+    const sx=e.clientX, sy=e.clientY, L=parseFloat(fig.style.left)||0, T=parseFloat(fig.style.top)||0;
+    let snap=false;
+    const mv=ev=>{ if(!snap){snapshot();snap=true;} fig.style.left=(L+(ev.clientX-sx)/k/pad.clientWidth*100).toFixed(2)+'%'; fig.style.top=(T+(ev.clientY-sy)/k/pad.clientHeight*100).toFixed(2)+'%'; placeStrip(); };
+    const up=()=>{ removeEventListener('mousemove',mv); removeEventListener('mouseup',up); if(snap){dirty=true;saveDraft();} };
+    addEventListener('mousemove',mv); addEventListener('mouseup',up);
+  }
+  handle.addEventListener('mousedown',e=>{
+    if(!sel||!sel.classList.contains('img')) return;
+    e.preventDefault();
+    const fig=sel, pad=fig.closest('.pad'), k=scaleOf(pad), r0=fig.getBoundingClientRect(), sx=e.clientX;
+    const base=fig.classList.contains('free')?pad.clientWidth:contentWidth(pad);
+    let snap=false;
+    const mv=ev=>{ if(!snap){snapshot();snap=true;} const w=Math.max(40,(r0.width+(ev.clientX-sx))/k); fig.style.width=Math.min(100,w/base*100).toFixed(2)+'%'; placeStrip(); };
+    const up=()=>{ removeEventListener('mousemove',mv); removeEventListener('mouseup',up); if(snap) changed(); };
+    addEventListener('mousemove',mv); addEventListener('mouseup',up);
+  });
+
+  // 復原、還原、變更
+  function pushUndo(fn){ undo.push(fn); if(undo.length>60) undo.shift(); }
+  function snapshot(){ const s=slides[cur], html=s.innerHTML; pushUndo(()=>{ s.innerHTML=html; if(editing) s.querySelector('.pad').setAttribute('contenteditable','true'); }); }
+  function undoLast(){ const fn=undo.pop(); if(!fn){ toast('沒有可以復原的操作'); return; } select(null); fn(); refresh(); go(Math.min(cur,N-1),true); dirty=true; saveDraft(); }
+  function pristineSection(i){
+    if(!pristineDoc) pristineDoc=new DOMParser().parseFromString(PRISTINE,'text/html');
+    const secs=pristineDoc.querySelectorAll('.slide'); return secs[i]?secs[i].innerHTML:null;
+  }
+  function revertSlide(){
+    const s=slides[cur]; const html=original.has(s)?original.get(s):pristineSection(cur);
+    if(html==null){ toast('這一頁沒有原始版本可以還原'); return; }
+    snapshot(); select(null); s.innerHTML=html; refresh(); go(cur,true); dirty=true; saveDraft();
+  }
+  function changed(){ dirty=true; stagger(); fitAll(); placeStrip(); saveDraftDebounced(); }
+
+  // 頁面操作
+  function cleanClone(sec){
+    const c=sec.cloneNode(true);
+    c.classList.remove('on');
+    const p=c.querySelector('.pad');
+    if(p){ p.removeAttribute('contenteditable'); ['transform','transform-origin','width','height','bottom'].forEach(k=>p.style.removeProperty(k)); if(!p.getAttribute('style')) p.removeAttribute('style'); }
+    c.querySelectorAll('.sel').forEach(el=>el.classList.remove('sel'));
+    c.querySelectorAll('[data-r]').forEach(el=>{ el.style.removeProperty('--i'); if(!el.getAttribute('style')) el.removeAttribute('style'); });
+    c.querySelectorAll('img[draggable]').forEach(i=>i.removeAttribute('draggable'));
+    return c;
+  }
+  function dupSlide(){ const s=slides[cur], c=cleanClone(s); s.after(c); original.set(c,c.innerHTML); const idx=cur; pushUndo(()=>{c.remove();cur=Math.min(idx,N-2);}); refresh(); go(idx+1,true); dirty=true; saveDraft(); }
+  function blankSlide(){
+    const s=slides[cur], c=document.createElement('section'); c.className='slide'; c.dataset.tag=s.dataset.tag||''; c.dataset.note='';
+    c.innerHTML='<div class="pad"><div class="eyebrow" data-r>新的一頁</div><h3 class="h3" data-r style="margin-top:1.4cqw">標題</h3><p class="lead" data-r>內文。點這裡直接修改，或用下方工具列插入圖片。</p></div>';
+    s.after(c); original.set(c,c.innerHTML); const idx=cur; pushUndo(()=>{c.remove();cur=Math.min(idx,N-2);}); refresh(); go(idx+1,true); dirty=true; saveDraft();
+  }
+  function delSlide(){
+    if(N<=1){ toast('至少要留一頁'); return; }
+    const s=slides[cur], nx=s.nextElementSibling, idx=cur;
+    pushUndo(()=>{ nx.before(s); cur=idx; });
+    select(null); s.remove(); refresh(); go(Math.min(idx,N-1),true); dirty=true; saveDraft();
+    toast('已刪除這一頁（↶ 復原 可以救回來）');
+  }
+  function moveSlide(d){
+    const s=slides[cur], t=slides[cur+d]; if(!t) return;
+    const idx=cur;
+    pushUndo(()=>{ if(d<0) s.before(t); else s.after(t); cur=idx; });
+    if(d<0) t.before(s); else t.after(s);
+    refresh(); go(idx+d,true); dirty=true; saveDraft();
+  }
+
+  // 序列化：#stage 內從 #fx 之後到 .zone.l 之前的節點（含註解與空白），投影片用清理過的版本
+  function slidesAreaHTML(){
+    const parts=[]; const stop=document.getElementById('zl');
+    for(let n=document.getElementById('fx').nextSibling; n&&n!==stop; n=n.nextSibling){
+      if(n.nodeType===8) parts.push('<!--'+n.data+'-->');
+      else if(n.nodeType===3) parts.push(n.data);
+      else if(n.nodeType===1&&n.classList.contains('slide')) parts.push(cleanClone(n).outerHTML);
+      else if(n.nodeType===1) parts.push(n.outerHTML);
+    }
+    return parts.join('');
+  }
+  const FX='<div id="fx"></div>', UI='<!-- ══════════ UI ══════════ -->';
+  function buildDocument(){
+    const a=PRISTINE.indexOf(FX)+FX.length, b=PRISTINE.indexOf(UI);
+    if(a<FX.length||b<0) throw new Error('找不到投影片區的邊界標記');
+    return '<!doctype html>\n'+PRISTINE.slice(0,a)+slidesAreaHTML()+PRISTINE.slice(b);
+  }
+  async function exportHTML(){
+    let html; try{ html=buildDocument(); }catch(e){ toast('匯出失敗：'+e.message,5000); return; }
+    let how='download';
+    if(window.showSaveFilePicker){
+      try{
+        const h=await showSaveFilePicker({suggestedName:FILE,types:[{description:'HTML',accept:{'text/html':['.html']}}]});
+        const w=await h.createWritable(); await w.write(html); await w.close(); how='picker';
+      }catch(e){ if(e.name==='AbortError') return; how='download'; }
+    }
+    if(how==='download'){
+      const blob=new Blob([html],{type:'text/html'}), a=document.createElement('a');
+      a.href=URL.createObjectURL(blob); a.download=FILE; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(a.href),10000);
+    }
+    dirty=false; clearDraft();
+    toast(how==='picker'?'已儲存 '+FILE:'已匯出 '+FILE+' 到下載資料夾 — 請用它取代 slides/ 裡的同名檔案',5000);
+  }
+  // 供驗證用（不影響使用）
+  window.__deck={buildDocument,insertImage,slidesAreaHTML,restoreDraft,get slides(){return slides;},get cur(){return cur;},setEditing,go,refresh};
+
+  // 草稿：每次改動都暫存到瀏覽器，忘記匯出也不會丟
+  function saveDraft(){ try{ localStorage.setItem(DRAFT_KEY,JSON.stringify({t:Date.now(),html:slidesAreaHTML()})); }catch(e){} }
+  function saveDraftDebounced(){ clearTimeout(draftTimer); draftTimer=setTimeout(saveDraft,600); }
+  function clearDraft(){ try{ localStorage.removeItem(DRAFT_KEY); }catch(e){} }
+  function restoreDraft(html){
+    const stop=document.getElementById('zl');
+    for(let n=document.getElementById('fx').nextSibling; n&&n!==stop;){ const nx=n.nextSibling; n.remove(); n=nx; }
+    const t=document.createElement('template'); t.innerHTML=html; stop.before(t.content);
+    original.clear(); refresh(); go(Math.max(0,Math.min(cur,N-1)),true); dirty=true;
+  }
+  addEventListener('beforeunload',e=>{ if(dirty){ e.preventDefault(); e.returnValue=''; } });
+
+  // 工具列
+  etb.addEventListener('click',e=>{
+    const b=e.target.closest('button[data-e]'); if(!b) return;
+    const fn={prev:()=>go(cur-1),next:()=>go(cur+1),toc:()=>toggle(toc),notes:()=>note.classList.toggle('on'),
+      dup:dupSlide,blank:blankSlide,mvL:()=>moveSlide(-1),mvR:()=>moveSlide(1),delSlide,undo:undoLast,revert:revertSlide,
+      save:exportHTML,exit:()=>setEditing(false)}[b.dataset.e];
+    if(fn) fn();
+  });
+  efile.addEventListener('change',()=>{ [...efile.files].forEach(insertImageFile); efile.value=''; });
+  ebtn.addEventListener('click',()=>setEditing(!editing));
+  document.getElementById('drestore').addEventListener('click',()=>{ try{ const d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null'); if(d&&d.html){ restoreDraft(d.html); setEditing(true); toast('已還原草稿，記得匯出'); } }catch(e){} dbanner.hidden=true; });
+  document.getElementById('ddiscard').addEventListener('click',()=>{ clearDraft(); dbanner.hidden=true; });
+
+  // ── 啟動 ─────────────────────────────────────────────────
+  refresh();
+  const start=parseInt(location.hash.slice(1),10);
+  go(Number.isFinite(start)&&start>0?start-1:0);
+  // 字型載入完成、資源載入完成、分頁重新可見時，再配適一次（第一次量測可能用的是替代字型）
+  const refit=()=>{fitAll();placeStrip();};
+  if(document.fonts&&document.fonts.ready) document.fonts.ready.then(refit);
+  addEventListener('load',refit);
+  document.addEventListener('visibilitychange',()=>{ if(!document.hidden) refit(); });
+  // 舞台尺寸只要有任何變化（視窗縮放、全螢幕、DevTools、裝置模擬）都重新配適
+  let rt; const refitSoon=()=>{clearTimeout(rt);rt=setTimeout(refit,120);};
+  addEventListener('resize',refitSoon);
+  if(window.ResizeObserver){ let w0=stage.clientWidth; new ResizeObserver(()=>{ if(stage.clientWidth!==w0){ w0=stage.clientWidth; refitSoon(); } }).observe(stage); }
+  try{ const d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null'); if(d&&d.html) dbanner.hidden=false; }catch(e){}
+})();
+</script>
+</body>
+</html>

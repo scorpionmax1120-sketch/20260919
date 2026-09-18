@@ -1,0 +1,1156 @@
+<!doctype html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>01 基礎｜後端伺服器基礎教學</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&amp;family=Noto+Sans+TC:wght@300;400;500;700;900&amp;display=swap" rel="stylesheet">
+<style>
+/* ══════════ SHARED ══════════ 三份簡報共用：引擎、版面、元件級距 */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{background:var(--void);display:grid;place-items:center;font-family:var(--sans);-webkit-font-smoothing:antialiased}
+#stage{width:min(100vw,177.78vh);aspect-ratio:16/9;container-type:inline-size;position:relative;overflow:hidden;background:var(--bg);color:var(--fg)}
+#fx{position:absolute;inset:0;z-index:5;pointer-events:none}
+
+.slide{position:absolute;inset:0;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .34s cubic-bezier(.22,1,.36,1),visibility .34s}
+.slide.on{opacity:1;visibility:visible;pointer-events:auto}
+.pad{position:absolute;inset:0;padding:4.5cqw 5.4cqw 6.4cqw;display:flex;flex-direction:column}
+.pad>*{min-width:0;max-width:100%;flex:0 0 auto}
+.slide.on [data-r]{animation:rise .52s cubic-bezier(.16,1,.3,1) both;animation-delay:calc(var(--i,0)*65ms)}
+@keyframes rise{from{opacity:0;transform:translateY(1.4cqw)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.slide,.slide.on [data-r]{transition:none;animation:none}}
+
+/* 底部 UI */
+#bar{position:absolute;left:0;bottom:0;height:.34cqw;width:100%;background:var(--acc);transform-origin:0 50%;transform:scaleX(0);transition:transform .34s cubic-bezier(.22,1,.36,1);z-index:6}
+#cnt,#tag{position:absolute;bottom:2.1cqw;font-family:var(--mono);font-size:1.25cqw;color:var(--fg3);letter-spacing:.14em;z-index:6}
+#cnt{right:2.4cqw}#tag{left:2.4cqw}
+.zone{position:absolute;top:0;bottom:0;width:14%;z-index:4;cursor:pointer}
+.zone.l{left:0}.zone.r{right:0}
+
+/* 覆蓋層 */
+.ov{position:absolute;inset:0;z-index:20;background:color-mix(in srgb,var(--void) 94%,transparent);padding:5cqw 6cqw;overflow:auto;display:none;font-family:var(--mono)}
+.ov.on{display:block}
+.ov h5{font-size:1.4cqw;letter-spacing:.3em;color:var(--acc);margin-bottom:2.4cqw;text-transform:uppercase}
+#toc ol{list-style:none;columns:2;column-gap:5cqw}
+#toc li{font-size:1.4cqw;line-height:2.25;color:var(--fg2);cursor:pointer;display:flex;gap:1.4cqw;break-inside:avoid}
+#toc li:hover{color:var(--fg)}
+#toc li b{color:var(--fg4);font-weight:400;min-width:3.4cqw}
+#toc li.cur{color:var(--acc)}
+#note{position:absolute;left:0;right:0;bottom:0;z-index:18;background:var(--panel);border-top:.14cqw solid var(--line);padding:2.2cqw 3cqw;font-size:1.45cqw;line-height:1.85;color:var(--fg2);display:none;max-height:38%;overflow:auto;font-family:var(--sans)}
+#note.on{display:block}
+#note::before{content:"講者備註";display:block;font-family:var(--mono);font-size:1.05cqw;letter-spacing:.28em;color:var(--fg4);margin-bottom:1cqw}
+#help dl{display:grid;grid-template-columns:auto 1fr;gap:1.2cqw 2.4cqw;font-size:1.4cqw;color:var(--fg2)}
+#help dt{color:var(--fg);text-align:right}
+
+/* ══ 元件語彙 ══ */
+.eyebrow{font-size:1.35cqw;color:var(--fg3);letter-spacing:.06em;flex:none}
+.eyebrow b{color:var(--fg);font-weight:400}
+.rule{height:.12cqw;background:var(--line);margin:1.5cqw 0;flex:none}
+
+.h1{font-size:6.6cqw;font-weight:900;line-height:1.08;letter-spacing:-.01em;text-shadow:var(--h1-shadow,none)}
+.h2{font-size:4.2cqw;font-weight:900;line-height:1.14;letter-spacing:-.01em}
+.h3{font-size:3.05cqw;font-weight:700;line-height:1.24}
+.lead{font-size:1.92cqw;color:var(--fg2);font-weight:300;line-height:1.7;max-width:46ch}
+.small{font-size:1.45cqw;color:var(--fg3);line-height:1.7}
+.hot{color:var(--acc)}
+.dim{color:var(--fg3)}
+.cur{display:inline-block;width:.6em;height:.9em;background:var(--fg);vertical-align:-.06em;margin-left:.16em;animation:blink 1.1s steps(1,end) infinite}
+@keyframes blink{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.cur{animation:none}}
+
+.bullets{list-style:none;margin-top:2.1cqw;display:flex;flex-direction:column;gap:1.3cqw}
+.bullets li{font-size:1.9cqw;line-height:1.5;padding-left:3cqw;position:relative;color:var(--fg)}
+.bullets li::before{content:"▸";position:absolute;left:0;color:var(--acc);font-family:var(--mono)}
+.bullets li span{display:block;font-size:1.48cqw;color:var(--fg3);margin-top:.4cqw;line-height:1.6;font-weight:300}
+.bullets.tight li{font-size:1.75cqw}
+
+.grid{display:grid;gap:1.8cqw;margin-top:2.2cqw}
+.grid>*{min-width:0}
+.g2{grid-template-columns:repeat(2,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g4{grid-template-columns:repeat(4,1fr)}
+.card{border:var(--card-bd);background:var(--card-bg);border-radius:var(--radius);box-shadow:var(--shadow);padding:1.8cqw 1.7cqw;position:relative}
+.card b{display:block;font-family:var(--label-font);font-size:1.08cqw;letter-spacing:var(--label-ls);color:var(--acc);margin-bottom:.8cqw;text-transform:uppercase}
+.card strong{display:block;font-size:2.1cqw;font-weight:700;margin-bottom:.7cqw}
+.card span{font-size:1.44cqw;color:var(--fg2);line-height:1.62;font-weight:300}
+
+.code{font-family:var(--mono);font-size:1.44cqw;line-height:1.8;background:var(--code-bg);border:var(--card-bd);border-radius:var(--radius);padding:1.7cqw 2cqw;white-space:pre;overflow:hidden;color:var(--fg2);margin-top:1.9cqw}
+.code .c{color:var(--fg4)}
+.code .k{color:var(--acc)}
+.code .s{color:var(--ok)}
+.code .f{color:var(--fg);font-weight:700}
+.code .hl{background:var(--acc-bg);display:inline-block;min-width:100%}
+.code.sm{font-size:1.28cqw;line-height:1.72}
+.code.xs{font-size:1.2cqw;line-height:1.66}
+
+.callout{border-left:.34cqw solid var(--acc);background:var(--acc-bg);padding:1.35cqw 1.9cqw;margin-top:1.9cqw;font-size:1.65cqw;line-height:1.6}
+.callout b{color:var(--acc)}
+.callout.ok{border-color:var(--ok);background:var(--ok-bg)}
+.callout.ok b{color:var(--ok)}
+
+.flow{display:flex;align-items:stretch;gap:0;margin-top:2.2cqw}
+.flow .st{flex:1;min-width:0;border:var(--card-bd);background:var(--card-bg);border-radius:var(--radius);padding:1.5cqw 1.2cqw;text-align:center}
+.flow .ar{display:flex;align-items:center;padding:0 .9cqw;color:var(--acc);font-family:var(--mono);font-size:1.8cqw}
+.flow .st b{display:block;font-family:var(--label-font);font-size:1.05cqw;color:var(--fg4);letter-spacing:.16em;margin-bottom:.8cqw}
+.flow .st strong{display:block;font-size:1.72cqw;font-weight:700}
+.flow .st span{display:block;font-size:1.25cqw;color:var(--fg3);margin-top:.5cqw;line-height:1.5;font-weight:300}
+
+.tbl{width:100%;border-collapse:collapse;margin-top:2cqw;font-size:1.52cqw}
+.tbl th{font-family:var(--label-font);font-size:1.12cqw;letter-spacing:.16em;color:var(--acc);text-transform:uppercase;text-align:left;padding:.9cqw 1.2cqw;border-bottom:.14cqw solid var(--line)}
+.tbl td{padding:1cqw 1.2cqw;border-bottom:.14cqw solid var(--line2);color:var(--fg2);vertical-align:top;line-height:1.6}
+.tbl td:first-child{color:var(--fg);font-weight:700}
+.tbl tr:last-child td{border-bottom:none}
+
+.tree{font-family:var(--mono);font-size:1.6cqw;line-height:1.92;color:var(--fg2);white-space:pre;margin-top:2cqw;overflow:hidden}
+.tree b{color:var(--fg);font-weight:700}
+.tree i{color:var(--fg4);font-style:normal}
+
+.kbd{font-family:var(--mono);font-size:.82em;border:.12cqw solid var(--fg3);border-bottom-width:.28cqw;padding:.15em .5em;border-radius:.25em;color:var(--fg)}
+.big{font-family:var(--mono);font-size:11cqw;font-weight:700;line-height:.86;color:var(--acc);letter-spacing:-.03em}
+.mt{margin-top:auto}
+.ctr{justify-content:center}
+.chapter .pad{justify-content:center}
+.chapter .big{margin-bottom:1.8cqw}
+.chapter .h2{font-size:5.2cqw}
+.chapter .lead{margin-top:1.8cqw;font-size:2.05cqw}
+.cover .pad{justify-content:flex-end;padding-bottom:9cqw}
+.cover .eyebrow{margin-bottom:auto}
+
+/* ══ 圖片區塊（編輯模式插入） ══ */
+.img{margin-top:1.6cqw;width:60%;position:relative}
+.img img{display:block;width:100%;height:auto;border:var(--card-bd);box-shadow:var(--shadow);background:var(--card-bg)}
+.img.c{margin-left:auto;margin-right:auto}
+.img.r{margin-left:auto}
+.img.free{position:absolute;margin:0;z-index:2}
+
+/* ══ 編輯模式 ══ */
+#ebtn{position:absolute;right:1.2cqw;top:1.2cqw;z-index:7;width:2.6cqw;height:2.6cqw;border:.1cqw solid var(--fg4);background:transparent;color:var(--fg3);font-size:1.4cqw;line-height:1;cursor:pointer;opacity:.18;transition:opacity .2s;border-radius:.3cqw;font-family:var(--sans)}
+#ebtn:hover,body.editing #ebtn{opacity:1}
+:fullscreen #ebtn{opacity:0}
+body.editing{padding-bottom:4.6rem}
+body.editing #stage{width:min(100vw,calc((100vh - 4.6rem)*1.7778))}
+body.editing .zone{display:none}
+body.editing .pad{cursor:text}
+body.editing .pad:focus{outline:none}
+body.editing .pad img{-webkit-user-drag:none;user-select:none}
+body.editing .sel{outline:.18cqw dashed var(--acc);outline-offset:.35cqw}
+body.editing .img.free{cursor:move}
+body.editing #note{cursor:text}
+body.editing #note:empty::after{content:"（點這裡輸入這一頁的講者備註）";color:var(--fg4)}
+#etb{position:fixed;left:0;right:0;bottom:0;z-index:50;display:flex;flex-wrap:wrap;align-items:center;gap:.45rem 1rem;padding:.55rem 1rem;background:#14140f;color:#e8e6dc;font:13px/1.4 system-ui,"Noto Sans TC",sans-serif;border-top:1px solid #333;box-shadow:0 -4px 20px rgba(0,0,0,.35)}
+#etb[hidden]{display:none}
+#etb .g{display:flex;align-items:center;gap:.35rem}
+#etb .g+.g{padding-left:1rem;border-left:1px solid #333}
+#etb button,#etb .btn{font:inherit;padding:.35rem .7rem;border:1px solid #444;background:#222;color:#e8e6dc;border-radius:4px;cursor:pointer;white-space:nowrap;display:inline-block}
+#etb button:hover,#etb .btn:hover{background:#333;border-color:#666}
+#etb .primary{background:#ff9a4d;color:#14140f;border-color:#ff9a4d;font-weight:700}
+#etb .primary:hover{background:#ffb070}
+#etb .danger:hover{background:#5a1f1f;border-color:#a33}
+#etb #epos{min-width:4.5rem;text-align:center;font-variant-numeric:tabular-nums;color:#aaa}
+#etb .hint{flex-basis:100%;color:#8a887c;font-size:12px}
+#bstrip{position:absolute;z-index:9;display:flex;gap:.15cqw;padding:0 0 .35cqw 0;transform:translate(-100%,-100%)}
+#bstrip[hidden]{display:none}
+#bstrip button{font:1.1cqw/1 system-ui,sans-serif;width:2.3cqw;height:2.3cqw;border:none;background:#14140f;color:#fff;cursor:pointer;border-radius:.25cqw;padding:0}
+#bstrip button:hover{background:var(--acc);color:#14140f}
+#bstrip button[data-act=free]{width:auto;padding:0 .6cqw}
+#bstrip button.on{background:var(--acc);color:#14140f}
+#bstrip:not(.img) .img-only{display:none}
+#bhandle{position:absolute;z-index:9;width:1.5cqw;height:1.5cqw;background:var(--acc);border:.12cqw solid #14140f;cursor:nwse-resize;transform:translate(-50%,-50%);border-radius:.15cqw}
+#bhandle[hidden]{display:none}
+#dbanner,#toast{position:absolute;left:50%;transform:translateX(-50%);z-index:30;display:flex;gap:.6rem;align-items:center;background:#14140f;color:#fff;padding:.5rem .9rem;border-radius:6px;font:13px system-ui,"Noto Sans TC",sans-serif;box-shadow:0 4px 18px rgba(0,0,0,.4);max-width:90%}
+#dbanner{top:1.2cqw}
+#toast{bottom:4cqw;pointer-events:none}
+#dbanner[hidden],#toast[hidden]{display:none}
+#dbanner button{font:inherit;padding:.25rem .6rem;border:1px solid #555;background:#222;color:#fff;border-radius:4px;cursor:pointer}
+#dbanner button:hover{background:#444}
+
+/* ══════════ SKIN ══════════ 05 琥珀機房 / Amber Terminal */
+:root{
+  --bg:#120e09; --void:#070503;
+  --fg:#ffb000; --fg2:#c9902a; --fg3:#8a6516; --fg4:#5d440f;
+  --acc:#ff7a3d; --ok:#8fd14f;
+  --line:#4a370d; --line2:#2e2208;
+  --card-bd:.14cqw solid var(--line); --card-bg:rgba(255,176,0,.025);
+  --code-bg:#0b0805; --acc-bg:rgba(255,122,61,.07); --ok-bg:rgba(143,209,79,.07);
+  --panel:#1b1509; --radius:.3cqw; --shadow:none;
+  --mono:"JetBrains Mono",ui-monospace,monospace;
+  --sans:"Noto Sans TC","JetBrains Mono",sans-serif;
+  --h1-shadow:0 0 1.8cqw rgba(255,176,0,.4);
+  --label-font:var(--mono); --label-ls:.2em;
+}
+#fx::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(to bottom,rgba(0,0,0,.30) 0 .16cqw,transparent .16cqw .52cqw)}
+#fx::after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 50% 44%,rgba(255,176,0,.10),transparent 66%)}
+.eyebrow{font-family:var(--mono)}
+</style>
+</head>
+<body>
+<div id="stage">
+<div id="fx"></div>
+
+<!-- ══════════ 開場 ══════════ -->
+<section class="slide cover" data-tag="OPENING" data-note="自我介紹 30 秒就好。重點放在「今天結束時你會有一個真的能用網址打開的網站」，先給他們一個具體的終點。">
+  <div class="pad">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>./start.sh --topic backend</b></div>
+    <h1 class="h1" data-r="">後端伺服器<br>基礎<span class="cur"></span></h1>
+    <p class="lead" data-r="" style="margin-top: 2.4cqw;">從系統架構、手寫 API，到 AI 協作開發</p>
+    <div class="eyebrow mt" data-r="" style="display: flex; gap: 3cqw; border-top: .14cqw solid var(--line); padding-top: 1.8cqw; margin-top: 4cqw;">
+      <span>2026.09.19</span><span>06:00:00</span><span>PART 1 / 3</span><span>國立臺中科技大學</span>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-tag="OPENING" data-note="花 2 分鐘把整天走一遍。特別強調第 5 主題（AI）為什麼要放在第 3 主題（手寫）之後 —— 順序是刻意的。">
+  <div class="pad">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>cat roadmap.txt</b></div>
+    <h2 class="h2" data-r="" style="margin-top: 2cqw;">今天的六小時</h2>
+    <div class="grid g3" data-r="">
+      <div class="card"><b>Part 1 · 100 min</b><strong>基礎</strong><span>01 資訊系統架構<br>02 用 Git 管理專案</span></div>
+      <div class="card"><b>Part 2 · 130 min</b><strong>開發</strong><span>03 Python 寫後端<br>04 網際網路與發佈</span></div>
+      <div class="card"><b>Part 3 · 110 min</b><strong>AI</strong><span>05 如何用 AI 開發<br>06 用 AI 進行測試</span></div>
+    </div>
+    
+  </div>
+</section>
+
+<section class="slide" data-tag="OPENING" data-note="這頁是給他們的承諾，也是期待管理。說清楚「不會變成」的部分，避免有人以為六小時能學會全端。">
+  <div class="pad">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>man expectations</b></div>
+    <h2 class="h2" data-r="" style="margin-top: 2cqw;">今天結束時</h2>
+    <div class="grid g2" data-r="">
+      <div>
+        <ul class="bullets">
+          <li>你會有一個能用網址打開的網站<span>登入頁 → 個人資料頁，跑在真的伺服器上</span></li>
+          <li>你會知道「後端」到底在做什麼<span>而不只是一個聽過的名詞</span></li>
+          <li>你能看懂一段 API 程式碼<span>並判斷 AI 給你的版本有沒有問題</span></li>
+        </ul>
+      </div>
+      
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-tag="OPENING" data-note="現場請大家打開終端機實際跑一次版本檢查。一定會有人沒裝好 —— 先讓他們跟旁邊的人一組，不要卡住全班。">
+  <div class="pad">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>./check-env.sh</b></div>
+    <h2 class="h2" data-r="" style="margin-top: 2cqw;">開始前，先檢查</h2>
+    <div class="code" data-r=""><span class="c"># 在終端機逐行貼上，四行都要有版本號跑出來</span>
+<span class="f">python3</span> --version        <span class="c"># 需要 3.10 以上</span>
+<span class="f">pip3</span> --version
+<span class="f">git</span> --version
+<span class="f">code</span> --version           <span class="c"># VS Code 命令列工具</span></div>
+    <div class="grid g2" data-r="" style="margin-top: 2.4cqw;">
+      <div class="callout ok" style="margin-top:0"><b>四行都有輸出</b> → 太好了，你可以開始了。</div>
+      
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ 主題 01 · 架構 ══════════ -->
+<section class="slide chapter" data-tag="TOPIC 01" data-note="章節頁停留 3 秒就好。直接接下一頁的提問。">
+  <div class="pad">
+    <div class="big" data-r="">01</div>
+    <h2 class="h2" data-r="">資訊系統架構</h2>
+    <p class="lead" data-r="">一個網站或應用，到底由哪些角色組成？它們各自負責什麼、又是怎麼溝通的？</p>
+    <div class="eyebrow mt" data-r="">PART 1 · 45 MIN</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 01" data-note="這題要真的點人回答，不要自問自答。通常會有人說「連到 Google 的伺服器」—— 很好，追問：那台伺服器裡面有什麼？這就自然帶到下一頁。">
+  <div class="pad ctr">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>echo $QUESTION</b></div>
+    <h2 class="h2" data-r="" style="margin-top: 3cqw; font-size: 5.4cqw;">你在網址列按下 Enter，<br>到底發生了什麼事？</h2>
+    <p class="lead" data-r="" style="margin-top: 3cqw;">從你的手指離開鍵盤，到畫面上出現內容 —— 這中間大約 0.3 秒，有十幾個角色接力跑完了一趟。今天的第一件事，就是把這趟旅程拆開來看。</p>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 01" data-note="三層式架構是整天的骨架，後面所有內容都掛在這張圖上。請他們把這三個詞抄下來。">
+  <div class="pad">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>tree --system --depth 1</b></div>
+    <h3 class="h3" data-r="" style="margin-top: 1.6cqw;">一個網站的最小組成</h3>
+    <div class="grid g3" data-r="">
+      <div class="card"><b>Frontend</b><strong>前端</strong><span>使用者看得到、摸得到的那一層。負責畫面、互動、輸入。<br><br>跑在<span class="hot">使用者的瀏覽器</span>裡。</span></div>
+      <div class="card"><b>Backend</b><strong>後端</strong><span>商業邏輯與權限的守門人。決定資料給不給、怎麼給。<br><br>跑在<span class="hot">你的伺服器</span>上。</span></div>
+      <div class="card"><b>Database</b><strong>資料庫</strong><span>資料真正住的地方。關機、重開都不會消失。<br><br>通常跟後端<span class="hot">放在一起或旁邊</span>。</span></div>
+    </div>
+    
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 01" data-note="前端這頁可以快一點，資管系學生大多碰過 HTML。重點是最後一行：前端的驗證擋不住壞人。">
+  <div class="pad">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>describe frontend</b></div>
+    <h3 class="h3" data-r="" style="margin-top: 1.6cqw;">前端：使用者看得到的那一層</h3>
+    <div class="grid g2" data-r="">
+      <div>
+        <ul class="bullets">
+          <li>把資料變成畫面<span>HTML 結構、CSS 樣式、JavaScript 互動</span></li>
+          <li>收集使用者的輸入<span>表單、按鈕、捲動</span></li>
+          <li>向後端要資料<span>用 fetch() 發出請求，拿到 JSON 再渲染</span></li>
+        </ul>
+      </div>
+      <div style="border-left:.14cqw solid var(--line);padding-left:2.6cqw">
+        <div class="eyebrow" style="color:var(--fg4);margin-bottom:1.4cqw">關鍵認知</div>
+        <p style="font-size:2cqw;line-height:1.7">前端的程式碼<span class="hot">全部都在使用者電腦上</span>，任何人按下 F12 都看得到、改得動。</p>
+        <p class="small" style="margin-top:2cqw">所以「前端有做檢查」從來不等於「安全」。這是今天最重要的觀念之一。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 01" data-note="這頁是主題 1 的核心。用「為什麼不能只有前端」來說明後端存在的理由，比條列職責有效得多。可以現場示範 F12 改前端的判斷式。">
+  <div class="pad">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>describe backend</b></div>
+    <h3 class="h3" data-r="" style="margin-top: 1.6cqw;">後端：那為什麼不能只有前端？</h3>
+    <div class="code" data-r=""><span class="c">// 如果登入判斷寫在前端……</span>
+<span class="k">if</span> (password === <span class="s">"admin123"</span>) {
+  showProfile();   <span class="c">// ← 任何人按 F12 就看到密碼了</span>
+}                  <span class="c">// ← 甚至可以直接改成 if (true)</span></div>
+    <div class="grid g3" data-r="" style="margin-top: 2.4cqw;">
+      <div class="card"><b>守門</b><strong>驗證身分與權限</strong><span>你是誰？你能看哪些資料？</span></div>
+      <div class="card"><b>邏輯</b><strong>執行商業規則</strong><span>扣庫存、算運費、發通知</span></div>
+      <div class="card"><b>看守</b><strong>唯一能碰資料庫的人</strong><span>前端永遠不該直接連資料庫</span></div>
+    </div>
+    <div class="callout" data-r=""><b>一句話：</b>後端存在的理由，是因為前端跑在別人的電腦上，不能被信任。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 01" data-note="用「關機測試」來解釋持久化：把程式關掉再打開，資料還在嗎？今天 demo 會先用記憶體假資料，最後換成 SQLite，剛好呼應這頁。">
+  <div class="pad">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>describe database</b></div>
+    <h3 class="h3" data-r="" style="margin-top: 1.6cqw;">資料庫：資料真正住的地方</h3>
+    <div class="grid g2" data-r="">
+      <div>
+        <ul class="bullets">
+          <li>持久化 Persistence<span>程式關掉、機器重開，資料還在</span></li>
+          <li>查詢 Query<span>從一百萬筆裡挑出符合條件的那幾筆，且要快</span></li>
+          <li>一致性 Consistency<span>轉帳時不會出現「扣了但沒入帳」</span></li>
+        </ul>
+      </div>
+      <div style="border-left:.14cqw solid var(--line);padding-left:2.6cqw">
+        <div class="eyebrow" style="color:var(--fg4);margin-bottom:1.4cqw">今天會用到</div>
+        <p style="font-size:2cqw;line-height:1.7"><span class="hot">SQLite</span> —— 一個檔案就是一個資料庫，不用另外裝伺服器。</p>
+        <p class="small" style="margin-top:2cqw">上午我們會先用 Python 的 dict 當假資料，讓你看清楚「換成資料庫」那一步到底改了什麼。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 01" data-note="HTTP 是三層之間唯一的語言。這頁開始進入協定細節，語速要放慢，尤其對高二學生。">
+  <div class="pad">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>protocol --between frontend backend</b></div>
+    <h3 class="h3" data-r="" style="margin-top: 1.6cqw;">它們怎麼講話？HTTP</h3>
+    <div class="flow" data-r="">
+      <div class="st"><b>CLIENT</b><strong>前端</strong><span>我想要 /api/me 的資料，這是我的通行證</span></div>
+      <div class="ar">──▶</div>
+      <div class="st"><b>SERVER</b><strong>後端</strong><span>通行證有效，這是你的資料，狀態 200</span></div>
+      <div class="ar">──▶<br></div>
+      <div class="st"><b>CLIENT</b><strong>前端</strong><span>收到 JSON，渲染成畫面</span></div>
+    </div>
+    <div class="callout" data-r="" style="margin-top: 3.4cqw;"><b>API 是一問一答的。</b>後端不能主動跟前端說話 —— 它只能等，然後回答。這個限制會影響你之後所有的設計。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 01" data-note="請他們打開 F12 → Network 分頁，隨便點一個網站，對照這張圖看真實的請求。親眼看到比講十遍有用。">
+  <div class="pad">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>curl -v https://api.example.com/api/me</b></div>
+    <h3 class="h3" data-r="" style="margin-top: 1.6cqw;">一個 HTTP 請求長什麼樣</h3>
+    <div class="code" data-r=""><span class="hl"><span class="k">POST</span> /api/login <span class="c">HTTP/1.1</span>          <span class="c">← 方法 + 路徑</span></span>
+Host: api.example.com
+Content-Type: application/json      <span class="c">← 我送的是 JSON</span>
+Authorization: Bearer eyJhbGci...   <span class="c">← 通行證放這裡</span>
+
+{<span class="s">"username"</span>: <span class="s">"jase"</span>, <span class="s">"password"</span>: <span class="s">"1234"</span>}   <span class="c">← Body，真正的資料</span></div>
+    <div class="grid g4" data-r="" style="margin-top: 2.4cqw;">
+      <div class="card"><b>GET</b><strong>拿資料</strong><span>不改變任何東西</span></div>
+      <div class="card"><b>POST</b><strong>新增 / 送出</strong><span>登入、註冊、下訂單</span></div>
+      <div class="card"><b>PUT</b><strong>更新</strong><span>修改既有資料</span></div>
+      <div class="card"><b>DELETE</b><strong>刪除</strong><span>移除資料</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 01" data-note="狀態碼要他們記住開頭數字的意義就好，不用背表。強調 4xx 是「你錯了」、5xx 是「我錯了」—— 這在除錯時是第一個判斷點。">
+  <div class="pad">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>http --status-codes</b></div>
+    <h3 class="h3" data-r="" style="margin-top: 1.6cqw;">回應與狀態碼</h3>
+    <table class="tbl" data-r="">
+      <tbody><tr><th>開頭</th><th>意思</th><th>你會遇到的</th><th>除錯方向</th></tr>
+      <tr><td>2xx</td><td>成功</td><td>200 OK · 201 Created</td><td>沒事，繼續</td></tr>
+      <tr><td>3xx</td><td>轉址</td><td>301 搬家了 · 304 沒變過</td><td>通常不用管</td></tr>
+      <tr><td>4xx</td><td><span class="hot">你（前端）錯了</span></td><td>400 格式錯 · 401 沒登入 · 403 沒權限 · 404 找不到</td><td>檢查你送出的請求</td></tr>
+      <tr><td>5xx</td><td><span class="hot">我（後端）錯了</span></td><td>500 程式爆炸 · 502 上游掛了</td><td>去看伺服器的錯誤日誌</td></tr>
+    </tbody></table>
+    
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 01" data-note="這頁資訊量大，不要每個都講。說明「這些不是你現在要學的，是要你知道它們存在、叫什麼名字」—— 以後看到求職條件才不會慌。">
+  <div class="pad">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>ls /infrastructure</b></div>
+    <h3 class="h3" data-r="" style="margin-top: 1.6cqw;">後端周圍還住著誰</h3>
+    <div class="grid g4" data-r="" style="gap: 1.3cqw; margin-top: 1.8cqw;">
+      <div class="card"><b>入口</b><strong>反向代理</strong><span>Nginx · Caddy<br>對外的唯一大門</span></div>
+      <div class="card"><b>入口</b><strong>API Gateway</strong><span>限流、認證、路由分派</span></div>
+      <div class="card"><b>加速</b><strong>快取</strong><span>Redis<br>把熱門答案先記起來</span></div>
+      <div class="card"><b>加速</b><strong>CDN</strong><span>圖片、CSS 就近供應</span></div>
+      <div class="card"><b>解耦</b><strong>訊息佇列</strong><span>RabbitMQ · Kafka<br>慢的事情排隊做</span></div>
+      <div class="card"><b>擴張</b><strong>負載平衡</strong><span>一台不夠，就分給十台</span></div>
+      <div class="card"><b>定位</b><strong>DNS</strong><span>把網域名稱翻成 IP</span></div>
+      <div class="card"><b>安全</b><strong>TLS 憑證</strong><span>網址列那個鎖頭</span></div>
+    </div>
+    <div class="callout" data-r="" style="margin-top: 1.1cqw; font-size: 1.5cqw;"><b>今天不會全部做過一次。</b>認得名字、知道它解決什麼問題就夠了。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 01" data-note="反向代理是最常被問「那是什麼」的名詞。用「公司總機」的比喻：外面的人只知道總機號碼，總機決定轉給誰。">
+  <div class="pad">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>describe reverse-proxy</b></div>
+    <h3 class="h3" data-r="" style="margin-top: 1.6cqw;">反向代理：所有人的第一站</h3>
+    <div class="tree" data-r="">瀏覽器 ──▶ <b>Nginx</b> ─┬─▶ <b>後端 A</b>  <i>／api/*   處理 API</i>
+              <i>:443</i>   ├─▶ <b>後端 B</b>  <i>／admin/* 後台服務</i>
+                     └─▶ <b>靜態檔</b>  <i>／*       HTML、圖片</i></div>
+    <ul class="bullets" data-r="" style="margin-top: 3cqw;">
+      <li>對外只開一個門<span>後面有幾台機器、跑什麼語言，外面完全不知道</span></li>
+      <li>HTTPS 在這裡處理<span>憑證裝一次就好，後面的服務可以繼續講 HTTP</span></li>
+      <li>擋掉明顯的壞請求<span>流量太大時先在這一層限流</span></li>
+    </ul>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 01" data-note="快取的核心是「重複的問題不要重複算」。舉例：首頁熱門排行，一萬個人看到的內容一樣，卻查了一萬次資料庫。">
+  <div class="pad">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>describe cache</b></div>
+    <h3 class="h3" data-r="" style="margin-top: 1.6cqw;">快取：重複的問題不要重複算</h3>
+    <div class="grid g2" data-r="">
+      <div class="card"><b>沒有快取</b><strong>每次都算一遍</strong><span>10,000 人看首頁熱門排行<br>→ 資料庫被查 10,000 次<br>→ 每次 200 ms<br><br><span class="hot">資料庫先陣亡</span></span></div>
+      <div class="card"><b>有快取</b><strong>算一次，存 60 秒</strong><span>第 1 人：查資料庫，存進 Redis<br>第 2–10,000 人：直接讀 Redis<br>→ 每次 2 ms<br><br><span class="hot">快 100 倍</span></span></div>
+    </div>
+    <div class="callout" data-r=""><b>代價是「資料可能有點舊」。</b>熱門排行慢 60 秒沒關係，銀行餘額就不行 —— 什麼能快取，是設計決策。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 01" data-note="這是主題 1 的總結圖，把前面所有名詞串成一條線。慢慢走一次，每一站問「這裡如果掛了會怎樣」。">
+  <div class="pad">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>trace --full "https://myapp.com/profile"</b></div>
+    <h3 class="h3" data-r="" style="margin-top: 1.4cqw;">一個請求的完整旅程</h3>
+    <div class="tree" data-r="" style="font-size: 1.72cqw; line-height: 2.15; margin-top: 2cqw;"><b>01</b> 瀏覽器  <i>檢查快取，沒有 → 準備發出請求</i>
+<b>02</b> DNS     <i>myapp.com 是誰？ → 203.0.113.45</i>
+<b>03</b> TCP+TLS <i>跟那個 IP 建立連線並交換憑證，鎖頭出現</i>
+<b>04</b> CDN     <i>圖片、CSS 就近給你，不勞煩主機</i>
+<b>05</b> Nginx   <i>看路徑 /profile → 轉給後端服務</i>
+<b>06</b> 後端    <i>驗證 token → 你是 jase，有權限</i>
+<b>07</b> 快取    <i>Redis 有這筆資料嗎？沒有 → 往下</i>
+<b>08</b> 資料庫  <i>SELECT * FROM users WHERE id=7</i>
+<b>09</b> 後端    <i>組成 JSON，回傳 200，順便寫進快取</i>
+<b>10</b> 瀏覽器  <i>收到 JSON → 渲染成畫面 → 你看到了</i></div>
+    <div class="callout" data-r="" style="margin-top: 2cqw;"><b>全部發生在約 0.3 秒內。</b>今天你會親手做出第 06 到第 09 步。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 01" data-note="小結頁。可以在這裡開放 2 分鐘提問，再進入 Git。">
+  <div class="pad">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>summary --topic 01</b></div>
+    <h3 class="h3" data-r="" style="margin-top: 1.6cqw;">主題 01 帶走三件事</h3>
+    <div class="grid g3" data-r="">
+      <div class="card"><b>01</b><strong>三層式架構</strong><span>前端管畫面、後端管邏輯與權限、資料庫管保存。今天做的每一行程式碼都會落在其中一層。</span></div>
+      <div class="card"><b>02</b><strong>前端不可信任</strong><span>它跑在別人的電腦上。所有真正的檢查都必須在後端再做一次。</span></div>
+      <div class="card"><b>03</b><strong>HTTP 是一問一答</strong><span>請求有方法、路徑、標頭、Body；回應有狀態碼。除錯先看狀態碼。</span></div>
+    </div>
+    <div class="callout ok" data-r=""><b>接下來 45 分鐘：</b>在寫任何程式碼之前，先學會怎麼不把自己的專案搞丟。</div>
+  </div>
+</section>
+
+<!-- ══════════ 主題 02 · Git ══════════ -->
+<section class="slide chapter" data-tag="TOPIC 02" data-note="換節奏。前一節是概念，這一節開始動手。">
+  <div class="pad">
+    <div class="big" data-r="">02</div>
+    <h2 class="h2" data-r="">用 Git 管理專案</h2>
+    <p class="lead" data-r="">不是教完整的 Git，是教「一個人做專案時，最低限度但正確」的 Git。</p>
+    <div class="eyebrow mt" data-r="">PART 1 · 45 MIN</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 02" data-note="這頁一定要問：有誰的檔案長這樣？全班都會笑，然後舉手。笑完之後問真正的問題 ——「哪一個是最新的？」通常沒人答得出來。">
+  <div class="pad ctr">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>ls ~/Desktop/期末專題/</b></div>
+    <div class="code" data-r="" style="font-size: 1.9cqw; line-height: 2.1;">報告.docx
+報告_修改版.docx
+報告_修改版2.docx
+報告_最終版.docx
+報告_最終版_真的最後.docx
+報告_最終版_真的最後_老師改過.docx
+<span class="hl">報告_最終版_真的最後_老師改過_2.docx</span></div>
+    <h3 class="h3" data-r="" style="margin-top: 3cqw;">問題來了：<span class="hot">哪一個是最新的？</span></h3>
+    <p class="lead" data-r="" style="margin-top: 1.6cqw;">而且，如果你想知道「上週三那版的第三章寫了什麼」，現在還找得回來嗎？</p>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 02" data-note="把版本控制的價值講成三件具體的事，不要講抽象的「協作」。第三點對一個人做專案的學生最有感。">
+  <div class="pad">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>why git</b></div>
+    <h3 class="h3" data-r="" style="margin-top: 1.6cqw;">版本控制到底解決什麼</h3>
+    <div class="grid g3" data-r="">
+      <div class="card"><b>紀錄</b><strong>每一次改動都留底</strong><span>誰、什麼時候、改了哪幾行、為什麼改。而且只留一份檔案。</span></div>
+      <div class="card"><b>回溯</b><strong>隨時回到任何一天</strong><span>「昨天還好好的」不再是絕望的一句話，而是一個指令。</span></div>
+      <div class="card"><b>分身</b><strong>安全地亂搞</strong><span>開一條分支試新功能，搞砸了就丟掉，主線完全不受影響。</span></div>
+    </div>
+    <div class="callout" data-r=""><b>對一個人做專案的你，最有用的是第三點。</b>有了分支，你才敢大膽改。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 02" data-note="三個區域是 Git 最容易混淆的地方。用「拍照」的比喻：工作目錄是現場，暫存區是取景框（決定這張照片要拍什麼），儲存庫是已經沖洗出來的相片。">
+  <div class="pad">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>git --explain-areas</b></div>
+    <h3 class="h3" data-r="" style="margin-top: 1.6cqw;">Git 的三個區域</h3>
+    <div class="flow" data-r="">
+      <div class="st"><b>WORKING DIR</b><strong>工作目錄</strong><span>你正在編輯的檔案<br><br><span class="dim">= 現場</span></span></div>
+      <div class="ar">git add ▶</div>
+      <div class="st"><b>STAGING</b><strong>暫存區</strong><span>你決定這次要記錄的改動<br><br><span class="dim">= 取景框</span></span></div>
+      <div class="ar">git commit ▶</div>
+      <div class="st"><b>REPOSITORY</b><strong>儲存庫</strong><span>永久保存的歷史紀錄<br><br><span class="dim">= 沖洗好的相片</span></span></div>
+    </div>
+    <div class="callout" data-r="" style="margin-top: 3.4cqw;"><b>為什麼要有中間那層？</b>因為你可能一次改了五個檔案，但其中只有三個屬於同一件事。暫存區讓你把它們分成兩次 commit。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 02" data-note="四個動作就夠應付今天。請他們把這頁拍照存起來。強調 pull 要在 push 之前做（雖然今天一個人做不會遇到衝突）。">
+  <div class="pad">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>git --core-commands</b></div>
+    <h3 class="h3" data-r="" style="margin-top: 1.6cqw;">核心四動作，先會這些就好</h3>
+    <table class="tbl" data-r="">
+      <tbody><tr><th>指令</th><th>做什麼</th><th>白話</th></tr>
+      <tr><td>git add .</td><td>把改動放進暫存區</td><td>「這些我要記錄下來」</td></tr>
+      <tr><td>git commit -m "訊息"</td><td>寫進本機的歷史</td><td>「存檔，並寫一句說明」</td></tr>
+      <tr><td>git push</td><td>推上遠端（GitHub）</td><td>「上傳到雲端備份」</td></tr>
+      <tr><td>git pull</td><td>拉下遠端的更新</td><td>「同步別人的進度」</td></tr>
+    </tbody></table>
+    <div class="callout" data-r=""><b>還有一個你會用到一百次的：</b><span class="hot">git status</span> —— 不確定現在是什麼狀態時就打它，它連下一步該做什麼都會提示你。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 02" data-note="現場跟做。這裡會卡住的通常是沒設定 user.name/email，所以放在最前面。">
+  <div class="pad">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>git config --setup</b></div>
+    <h3 class="h3" data-r="" style="margin-top: 1.4cqw;">第一次使用：設定你是誰</h3>
+    <div class="code" data-r=""><span class="c"># 整台電腦只要設定一次，之後每個專案都會用這個身分</span>
+<span class="f">git</span> config --global user.name <span class="s">"Your Name"</span>
+<span class="f">git</span> config --global user.email <span class="s">"you@example.com"</span>
+
+<span class="c"># 順便把預設分支名稱設成 main（現在的慣例）</span>
+<span class="f">git</span> config --global init.defaultBranch main
+
+<span class="c"># 確認一下</span>
+<span class="f">git</span> config --list | grep user</div>
+    <div class="callout" data-r=""><b>email 建議用你 GitHub 註冊的那個。</b>否則 GitHub 不會把 commit 算在你的貢獻紀錄上。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 02" data-note="讓全班一起做完這七行。做完請他們舉手，確認全班都有第一個 commit 再往下。這是今天第一個實作檢查點。">
+  <div class="pad">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>./exercise-01.sh</b> <span class="hot">← 一起做</span></div>
+    <h3 class="h3" data-r="" style="margin-top: 1.4cqw;">實作：你的第一個 commit</h3>
+    <div class="code sm" data-r=""><span class="c"># 1. 建立專案資料夾並進入</span>
+<span class="f">mkdir</span> miniprofile &amp;&amp; <span class="f">cd</span> miniprofile
+
+<span class="c"># 2. 讓 Git 開始管理這個資料夾</span>
+<span class="f">git</span> init
+
+<span class="c"># 3. 隨便建立一個檔案</span>
+<span class="f">echo</span> <span class="s">"# MiniProfile"</span> &gt; README.md
+
+<span class="c"># 4. 看看 Git 現在怎麼想（重要！）</span>
+<span class="f">git</span> status
+
+<span class="c"># 5. 加入暫存區 → 存檔</span>
+<span class="f">git</span> add .
+<span class="f">git</span> commit -m <span class="s">"初始化專案"</span></div>
+    
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 02" data-note="commit message 是最容易被忽略、但半年後最感謝自己的地方。強調寫「為什麼」比寫「改了什麼」有價值 —— 改了什麼看 diff 就知道了。">
+  <div class="pad">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>git log --quality</b></div>
+    <h3 class="h3" data-r="" style="margin-top: 1.6cqw;">commit message 怎麼寫</h3>
+    <div class="grid g2" data-r="">
+      <div class="card"><b>❌ 半年後的你看不懂</b><strong>沒用的訊息</strong><span style="font-family:var(--mono);line-height:2">update<br>fix<br>改好了<br>aaa<br>最終版<br>.</span></div>
+      <div class="card"><b>✓ 半年後的你會感謝</b><strong>有用的訊息</strong><span style="font-family:var(--mono);line-height:2">新增登入 API<br>修正 token 過期未檢查的問題<br>把假資料換成 SQLite<br>調整 CORS 允許來源</span></div>
+    </div>
+    <div class="callout" data-r=""><b>訣竅：</b>寫「為什麼改」，不要寫「改了什麼」。改了什麼看 <span class="hot">git diff</span> 就知道了，為什麼改只有你知道。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 02" data-note="分支的比喻：電動遊戲的存檔點。開分支 = 在存檔點複製一份去冒險，死了不影響本尊。">
+  <div class="pad">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>git branch --explain</b></div>
+    <h3 class="h3" data-r="" style="margin-top: 1.4cqw;">分支：安全地亂搞</h3>
+    <div class="tree" data-r="" style="font-size: 1.8cqw;">main     ●───●───●───────────●  <i>← 隨時都能跑的穩定版</i>
+                  ╲         ╱
+login-api          ●───●───●     <i>← 在這裡大膽實驗</i>
+                  <i>開分支</i>   <i>合併回去</i></div>
+    <div class="code sm" data-r=""><span class="f">git</span> switch -c login-api    <span class="c"># 開一條新分支並跳過去</span>
+<span class="c"># ……在這裡改東改西，commit 好幾次……</span>
+<span class="f">git</span> switch main            <span class="c"># 跳回主線</span>
+<span class="f">git</span> merge login-api        <span class="c"># 把成果合併進來</span>
+<span class="f">git</span> branch -d login-api    <span class="c"># 收工，刪掉分支</span></div>
+    <div class="callout" data-r=""><b>什麼時候該開分支？</b>當你要做的事「可能會做壞」或「做到一半」時。今天下午加功能就用這個方式。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 02" data-note="衝突不用講太深，但要先打預防針，否則他們第一次遇到會嚇到。重點：衝突是 Git 在問你要哪一版，不是報錯。">
+  <div class="pad">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>git merge --conflict</b></div>
+    <h3 class="h3" data-r="" style="margin-top: 1.4cqw;">衝突：兩個人改了同一行</h3>
+    <div class="code sm" data-r=""><span class="c">&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD              ← 這是你的版本</span>
+<span class="f">PORT</span> = <span class="s">8000</span>
+<span class="c">=======                      ← 分隔線</span>
+<span class="f">PORT</span> = <span class="s">3000</span>
+<span class="c">&gt;&gt;&gt;&gt;&gt;&gt;&gt; login-api         ← 這是分支的版本</span></div>
+    <ul class="bullets tight" data-r="" style="margin-top: 1.8cqw;">
+      <li>這不是錯誤訊息<span>Git 只是在問你：這一行要留哪個？它不敢替你決定</span></li>
+      <li>做法：留下你要的內容，連同那三行標記一起刪掉</li>
+      <li>然後 <span class="hot">git add</span> → <span class="hot">git commit</span>，衝突就解決了</li>
+    </ul>
+    <div class="callout" data-r=""><b>VS Code 會幫你標色</b>並提供選擇按鈕，不必手動刪。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 02" data-note="切到 VS Code 實際操作一次。重點是讓他們知道「不背指令也能做」，降低門檻 —— 但前面的指令還是要懂，因為出事時只有終端機救得了你。">
+  <div class="pad">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>code . --show-scm</b></div>
+    <h3 class="h3" data-r="" style="margin-top: 1.6cqw;">在 VS Code 裡做完全部的事</h3>
+    <div class="grid g2" data-r="">
+      <div>
+        <ul class="bullets">
+          <li>左側第三個圖示：原始檔控制<span>快捷鍵 Ctrl/Cmd + Shift + G</span></li>
+          <li>檔案旁的 <span class="hot">+</span> 號 = git add<span>把這個檔案放進暫存區</span></li>
+          <li>上方輸入框打訊息 → 打勾 = git commit<span>訊息不能空白，它會擋你</span></li>
+          <li>底部狀態列的雲朵圖示 = push / pull<span>數字代表落後或超前幾個 commit</span></li>
+        </ul>
+      </div>
+      <div style="border-left:.14cqw solid var(--line);padding-left:2.6cqw">
+        <div class="eyebrow" style="color:var(--fg4);margin-bottom:1.4cqw">但還是要懂指令</div>
+        <p style="font-size:1.95cqw;line-height:1.7">圖形介面在<span class="hot">順利的時候</span>很好用。</p>
+        <p style="font-size:1.95cqw;line-height:1.7;margin-top:1.4cqw">出事的時候，網路上所有的解法都是<span class="hot">指令</span>。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 02" data-note="Git Graph 是這節的高潮。裝好之後點開，讓他們看到自己剛剛做的 commit 變成一個圖。視覺化會讓「分支」這個抽象概念突然變具體。">
+  <div class="pad">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>code --install-extension mhutchie.git-graph</b></div>
+    <h3 class="h3" data-r="" style="margin-top: 1.4cqw;">Git Graph：把歷史變成一張圖</h3>
+    <div class="grid g2" data-r="">
+      <div>
+        <div class="eyebrow" style="color:var(--fg4);margin-bottom:1.2cqw">安裝</div>
+        <ul class="bullets tight" style="margin-top:0">
+          <li>Extensions 面板搜尋 <span class="hot">Git Graph</span><span>作者 mhutchie，下載數最多的那個</span></li>
+          <li>安裝後在底部狀態列點 <span class="hot">Git Graph</span><span>或 Ctrl/Cmd+Shift+P 打 Git Graph</span></li>
+        </ul>
+      </div>
+      <div>
+        <div class="eyebrow" style="color:var(--fg4);margin-bottom:1.2cqw">你會看懂什麼</div>
+        <ul class="bullets tight" style="margin-top:0">
+          <li>每個圓點 = 一個 commit<span>點下去看那次改了哪幾行</span></li>
+          <li>每條線 = 一條分支<span>分岔就是開分支，匯流就是 merge</span></li>
+          <li>彩色標籤 = 分支名 / 遠端位置<span>一眼看出本機跟 GitHub 差多少</span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout ok" data-r=""><b>現在打開它，看你自己剛剛那個 commit。</b>只有一個點 —— 但那是你專案歷史的第一格。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="TOPIC 02" data-note="第二個實作檢查點。做完後在 Git Graph 上會看到一個明顯的分岔再合併的形狀，那個「看到」就是這節的目標。時間不夠可以只做到 merge。">
+  <div class="pad">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>./exercise-02.sh</b> <span class="hot">← 一起做</span></div>
+    <h3 class="h3" data-r="" style="margin-top: 1.4cqw;">實作：做出一個看得見的分岔</h3>
+    <div class="code" data-r=""><span class="c"># 1. 開一條分支</span>
+<span class="f">git</span> switch -c add-index
+
+<span class="c"># 2. 新增一個檔案並 commit</span>
+<span class="f">echo</span> <span class="s">"&lt;h1&gt;Hello&lt;/h1&gt;"</span> &gt; index.html
+<span class="f">git</span> add . &amp;&amp; <span class="f">git</span> commit -m <span class="s">"新增首頁骨架"</span>
+
+<span class="c"># 3. 回到主線並合併</span>
+<span class="f">git</span> switch main
+<span class="f">git</span> merge add-index
+
+<span class="c"># 4. 打開 Git Graph 看形狀 ← 這才是重點</span></div>
+    <div class="callout" data-r=""><b>進階挑戰（給行有餘力的同學）：</b>在 main 和分支上各改同一行，製造一次衝突，然後把它解掉。</div>
+  </div>
+</section>
+
+<section class="slide" data-tag="BREAK" data-note="休息 10 分鐘。宣布時務必講清楚「幾點幾分回來」，不要只說休息十分鐘。回來後直接進入今天最重的一段。">
+  <div class="pad ctr">
+    <div class="eyebrow" data-r="">nutc@workshop:~$ <b>summary --part 1 &amp;&amp; sleep 600</b></div>
+    <h2 class="h2" data-r="" style="margin-top: 2.4cqw;">Part 1 完成</h2>
+    <div class="grid g2" data-r="" style="margin-top: 3cqw;">
+      <div class="card"><b>Topic 01</b><strong>你現在有一張地圖</strong><span>知道前端、後端、資料庫各自在做什麼，以及一個請求怎麼跑完全程。</span></div>
+      <div class="card"><b>Topic 02</b><strong>你現在有一張安全網</strong><span>專案已經被 Git 管理，接下來不管怎麼改，都回得去。</span></div>
+    </div>
+    <div class="callout ok" data-r="" style="margin-top: 3cqw;"><b>中午休息。</b>回來之後，我們用 90 分鐘親手把地圖中間那塊 —— 後端 —— 蓋出來。</div>
+  </div>
+</section>
+
+<!-- ══════════ UI ══════════ -->
+<!-- ══════════ UI ══════════ -->
+<div class="zone l" id="zl"></div>
+<div class="zone r" id="zr"></div>
+<div id="tag"></div>
+<div id="cnt"></div>
+<div id="bar"></div>
+<div class="ov" id="toc"><h5>目錄 — 點擊跳頁</h5></div>
+<div class="ov" id="help"><h5>鍵盤操作</h5>
+  <dl>
+    <dt>→ / ↓ / Space</dt><dd>下一頁</dd>
+    <dt>← / ↑</dt><dd>上一頁</dd>
+    <dt>Home / End</dt><dd>第一頁 / 最後一頁</dd>
+    <dt>O</dt><dd>目錄（可點擊跳頁）</dd>
+    <dt>N</dt><dd>講者備註</dd>
+    <dt>F</dt><dd>全螢幕</dd>
+    <dt>E</dt><dd>編輯模式：直接改文字、插入圖片、調整區塊與頁面順序，改完匯出 HTML</dd>
+    <dt>?</dt><dd>這張說明</dd>
+    <dt>Esc</dt><dd>關閉覆蓋層</dd>
+  </dl>
+</div>
+<div id="note"></div>
+<button id="ebtn" type="button" title="編輯模式（E）">✎</button>
+<div id="bstrip" hidden="">
+  <button type="button" data-act="parent" title="選取外層區塊">↖</button>
+  <button type="button" data-act="up" title="往上移">↑</button>
+  <button type="button" data-act="down" title="往下移">↓</button>
+  <button type="button" data-act="alignL" class="img-only" title="靠左">◧</button>
+  <button type="button" data-act="alignC" class="img-only" title="置中">▣</button>
+  <button type="button" data-act="alignR" class="img-only" title="靠右">◨</button>
+  <button type="button" data-act="free" class="img-only" title="自由放置：可拖曳到投影片任何位置；再按一次回到排版流">自由</button>
+  <button type="button" data-act="del" title="刪除這個區塊">✕</button>
+</div>
+<div id="bhandle" hidden="" title="拖曳縮放"></div>
+<div id="dbanner" hidden=""><span>偵測到上次未匯出的編輯</span><button type="button" id="drestore">還原</button><button type="button" id="ddiscard">捨棄</button></div>
+<div id="toast" hidden=""></div>
+</div>
+<div id="etb" hidden="">
+  <div class="g">
+    <button type="button" data-e="prev" title="上一頁（PageUp）">‹</button>
+    <span id="epos">1 / 1</span>
+    <button type="button" data-e="next" title="下一頁（PageDown）">›</button>
+    <button type="button" data-e="toc">目錄</button>
+    <button type="button" data-e="notes">備註</button>
+  </div>
+  <div class="g">
+    <label class="btn" title="插入圖片到目前這頁（也可以直接把圖片拖進來、或 Ctrl/Cmd+V 貼上）">＋ 圖片<input id="efile" type="file" accept="image/*" multiple="" hidden=""></label>
+    <button type="button" data-e="dup">複製此頁</button>
+    <button type="button" data-e="blank">新增空白頁</button>
+    <button type="button" data-e="mvL" title="這一頁往前移">頁 ◀</button>
+    <button type="button" data-e="mvR" title="這一頁往後移">頁 ▶</button>
+    <button type="button" data-e="delSlide" class="danger">刪除此頁</button>
+  </div>
+  <div class="g">
+    <button type="button" data-e="undo" title="復原上一個操作">↶ 復原</button>
+    <button type="button" data-e="revert" title="把這一頁還原成檔案原本的樣子">還原此頁</button>
+  </div>
+  <div class="g">
+    <button type="button" data-e="save" class="primary" title="匯出成 HTML 檔（Ctrl/Cmd + S）">💾 匯出 HTML</button>
+    <button type="button" data-e="exit">離開編輯</button>
+  </div>
+  <div class="hint">點文字直接修改（Enter 換行）· 點區塊出現 ↖↑↓✕ · 圖片：拖曳右下角縮放、按「自由」後可任意拖放 · 備註面板也可直接編輯 · 改完記得「匯出 HTML」並取代 slides/ 裡的同名檔案</div>
+</div>
+
+<script>
+(function(){
+  // 載入當下、任何 JS 改動之前的原始文件；匯出時以它為底，只替換投影片區
+  const PRISTINE=document.documentElement.outerHTML;
+  const stage=document.getElementById('stage');
+  const bar=document.getElementById('bar'), cnt=document.getElementById('cnt'), tag=document.getElementById('tag');
+  const note=document.getElementById('note'), toc=document.getElementById('toc'), help=document.getElementById('help');
+  let slides=[], N=0, cur=-1, ol=null, tocItems=[];
+
+  // ── 引擎 ─────────────────────────────────────────────────
+  function stagger(){ slides.forEach(s=>s.querySelectorAll('[data-r]').forEach((el,i)=>el.style.setProperty('--i',i))); }
+
+  function buildToc(){
+    if(ol) ol.remove();
+    ol=document.createElement('ol');
+    slides.forEach((s,i)=>{
+      const h=s.querySelector('.h1,.h2,.h3');
+      const li=document.createElement('li');
+      const b=document.createElement('b'); b.textContent=String(i+1).padStart(2,'0');
+      const t=document.createElement('span'); t.textContent=h?h.textContent.trim().replace(/\s+/g,' '):'—';
+      li.append(b,t);
+      li.addEventListener('click',()=>{go(i);closeAll();});
+      ol.appendChild(li);
+    });
+    toc.appendChild(ol); tocItems=[...ol.children];
+  }
+
+  // 自動配適：量出每頁內容的自然高度，超出就整頁等比縮小
+  function fitAll(){
+    const tight=[];
+    slides.forEach((s,i)=>{
+      const pad=s.querySelector('.pad');
+      pad.style.transform='';pad.style.width='';pad.style.height='';
+      pad.style.bottom='auto';pad.style.height='auto';
+      const need=pad.offsetHeight;
+      pad.style.bottom='';pad.style.height='';
+      const have=stage.clientHeight;
+      if(need>have+1){
+        const k=Math.max(.75,have/need);
+        pad.style.transformOrigin='top left';
+        pad.style.transform='scale('+k+')';
+        pad.style.width=(100/k)+'%';
+        pad.style.height=(100/k)+'%';
+        if(k<=.75) tight.push(i+1);
+      }
+    });
+    if(tight.length) console.warn('內容過多、已縮到下限的頁：',tight.join(', '));
+  }
+
+  function refresh(){
+    slides=[...stage.querySelectorAll('.slide')]; N=slides.length;
+    stagger(); buildToc(); fitAll();
+    if(editing) slides.forEach(s=>s.querySelector('.pad').setAttribute('contenteditable','true'));
+  }
+
+  function go(n,force){
+    n=Math.max(0,Math.min(N-1,n));
+    if(n===cur&&!force) return;
+    slides.forEach(s=>s.classList.remove('on'));
+    cur=n; slides[cur].classList.add('on');
+    bar.style.transform='scaleX('+((cur+1)/N)+')';
+    cnt.textContent=String(cur+1).padStart(2,'0')+' / '+N;
+    tag.textContent=slides[cur].dataset.tag||'';
+    note.textContent=slides[cur].dataset.note||(editing?'':'（這頁沒有備註）');
+    tocItems.forEach((li,i)=>li.classList.toggle('cur',i===cur));
+    history.replaceState(null,'','#'+(cur+1));
+    if(editing){ select(null); epos.textContent=(cur+1)+' / '+N; }
+  }
+  function closeAll(){toc.classList.remove('on');help.classList.remove('on');}
+  function toggle(el){const was=el.classList.contains('on');closeAll();if(!was)el.classList.add('on');}
+
+  document.addEventListener('keydown',e=>{
+    const k=e.key;
+    if(editing){
+      if((e.metaKey||e.ctrlKey)&&k.toLowerCase()==='s'){e.preventDefault();exportHTML();return;}
+      if(k==='Escape'){closeAll();select(null);return;}
+      if(k==='PageDown'){e.preventDefault();go(cur+1);}
+      else if(k==='PageUp'){e.preventDefault();go(cur-1);}
+      return;                                  // 其他按鍵交給文字編輯
+    }
+    if(k==='Escape'){closeAll();note.classList.remove('on');return;}
+    if(k==='ArrowRight'||k==='ArrowDown'||k==='PageDown'||k===' '){e.preventDefault();go(cur+1);}
+    else if(k==='ArrowLeft'||k==='ArrowUp'||k==='PageUp'){e.preventDefault();go(cur-1);}
+    else if(k==='Home'){go(0);}
+    else if(k==='End'){go(N-1);}
+    else if(k==='o'||k==='O'){toggle(toc);}
+    else if(k==='n'||k==='N'){note.classList.toggle('on');}
+    else if(k==='e'||k==='E'){setEditing(true);}
+    else if(k==='?'||k==='/'){toggle(help);}
+    else if(k==='f'||k==='F'){document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();}
+  });
+
+  document.getElementById('zl').addEventListener('click',()=>go(cur-1));
+  document.getElementById('zr').addEventListener('click',()=>go(cur+1));
+  [toc,help].forEach(o=>o.addEventListener('click',e=>{if(e.target===o)closeAll();}));
+
+  let tx=0;
+  stage.addEventListener('touchstart',e=>{tx=e.changedTouches[0].clientX;},{passive:true});
+  stage.addEventListener('touchend',e=>{
+    if(editing) return;
+    const d=e.changedTouches[0].clientX-tx;
+    if(Math.abs(d)>50) go(cur+(d<0?1:-1));
+  },{passive:true});
+
+  // ── 編輯模式 ─────────────────────────────────────────────
+  const etb=document.getElementById('etb'), ebtn=document.getElementById('ebtn');
+  const strip=document.getElementById('bstrip'), handle=document.getElementById('bhandle');
+  const epos=document.getElementById('epos'), efile=document.getElementById('efile');
+  const dbanner=document.getElementById('dbanner'), toastEl=document.getElementById('toast');
+  const FILE=(()=>{ try{ const n=decodeURIComponent(location.pathname.split('/').pop()||''); return /\.html?$/i.test(n)?n:(document.title.split('｜')[0].trim()||'slides')+'.html'; }catch(e){ return 'slides.html'; } })();
+  const DRAFT_KEY='deck-draft:'+FILE;
+  const BLOCK_SEL='.pad > *, .grid > *, .bullets > li';
+  let editing=false, sel=null, dirty=false, toastTimer, fitTimer, draftTimer;
+  const undo=[];                 // 每筆是一個「還原」函式
+  const original=new Map();      // section -> 進入編輯前的 innerHTML
+  let pristineDoc=null;
+
+  function toast(msg,ms){ toastEl.textContent=msg; toastEl.hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>toastEl.hidden=true,ms||2600); }
+
+  function setEditing(on){
+    if(on===editing) return;
+    editing=on;
+    document.body.classList.toggle('editing',on);
+    etb.hidden=!on;
+    slides.forEach(s=>{
+      const p=s.querySelector('.pad');
+      if(on){ if(!original.has(s)) original.set(s,s.innerHTML); p.setAttribute('contenteditable','true'); }
+      else p.removeAttribute('contenteditable');
+    });
+    if(on) note.setAttribute('contenteditable','true'); else note.removeAttribute('contenteditable');
+    select(null); closeAll();
+    if(cur>=0) go(cur,true);
+    setTimeout(()=>{fitAll();placeStrip();},0);
+    if(!on&&dirty) toast('還沒匯出。草稿已暫存在這個瀏覽器，下次打開會問你要不要還原。',4200);
+  }
+
+  // 區塊選取與浮動工具
+  function select(el){
+    if(sel) sel.classList.remove('sel');
+    sel=el&&el.isConnected?el:null;
+    if(sel) sel.classList.add('sel');
+    placeStrip();
+  }
+  function placeStrip(){
+    if(!editing||!sel||!sel.isConnected){ strip.hidden=true; handle.hidden=true; return; }
+    const r=sel.getBoundingClientRect(), s=stage.getBoundingClientRect();
+    strip.hidden=false;
+    strip.style.left=(r.right-s.left)+'px'; strip.style.top=(r.top-s.top)+'px';
+    strip.style.transform=(r.top-s.top)>s.width*.03?'translate(-100%,-100%)':'translate(-100%,0)';
+    const isImg=sel.classList.contains('img');
+    strip.classList.toggle('img',isImg);
+    strip.querySelector('[data-act=free]').classList.toggle('on',isImg&&sel.classList.contains('free'));
+    handle.hidden=!isImg;
+    if(isImg){ handle.style.left=(r.right-s.left)+'px'; handle.style.top=(r.bottom-s.top)+'px'; }
+  }
+  addEventListener('resize',placeStrip);
+
+  stage.addEventListener('mousedown',e=>{
+    if(!editing) return;
+    if(strip.contains(e.target)||handle.contains(e.target)||dbanner.contains(e.target)||e.target===ebtn) return;
+    const pad=e.target.closest('.slide.on .pad');
+    if(!pad){ select(null); return; }
+    const b=e.target.closest(BLOCK_SEL);
+    select(b&&pad.contains(b)?b:null);
+    if(b&&b.classList.contains('img')&&b.classList.contains('free')) startDrag(e,b);
+  });
+  strip.addEventListener('mousedown',e=>e.preventDefault());
+  strip.addEventListener('click',e=>{
+    const b=e.target.closest('button'); if(!b||!sel) return;
+    const act=b.dataset.act;
+    if(act==='parent'){ const p=sel.parentElement&&sel.parentElement.closest(BLOCK_SEL); if(p) select(p); return; }
+    snapshot();
+    if(act==='up'){ const p=sel.previousElementSibling; if(p) sel.parentNode.insertBefore(sel,p); }
+    else if(act==='down'){ const n=sel.nextElementSibling; if(n) sel.parentNode.insertBefore(n,sel); }
+    else if(act==='del'){ const s=sel; select(null); s.remove(); }
+    else if(act==='alignL'){ sel.classList.remove('c','r'); }
+    else if(act==='alignC'){ sel.classList.remove('r'); sel.classList.add('c'); }
+    else if(act==='alignR'){ sel.classList.remove('c'); sel.classList.add('r'); }
+    else if(act==='free'){ toggleFree(sel); }
+    changed();
+  });
+
+  // 文字編輯：Enter 換行（li 裡維持原生行為以便新增條列）、貼上只留純文字
+  stage.addEventListener('keydown',e=>{
+    if(!editing||e.key!=='Enter'||e.shiftKey) return;
+    const pad=e.target.closest&&e.target.closest('.pad'); if(!pad) return;
+    const selNode=getSelection().anchorNode, inLi=selNode&&(selNode.nodeType===1?selNode:selNode.parentElement).closest('li');
+    if(inLi) return;
+    e.preventDefault(); document.execCommand('insertLineBreak');
+  });
+  stage.addEventListener('input',e=>{
+    if(!editing) return;
+    if(e.target.closest&&e.target.closest('.pad')){ dirty=true; clearTimeout(fitTimer); fitTimer=setTimeout(()=>{fitAll();placeStrip();},500); saveDraftDebounced(); }
+  });
+  stage.addEventListener('paste',e=>{
+    if(!editing) return;
+    const files=[...((e.clipboardData&&e.clipboardData.files)||[])].filter(f=>f.type.startsWith('image/'));
+    if(files.length){ e.preventDefault(); files.forEach(insertImageFile); return; }
+    if(e.target.closest&&e.target.closest('.pad')){ e.preventDefault(); document.execCommand('insertText',false,e.clipboardData.getData('text/plain')); }
+  });
+  stage.addEventListener('dragover',e=>{ if(editing) e.preventDefault(); });
+  stage.addEventListener('drop',e=>{ if(!editing) return; e.preventDefault(); [...e.dataTransfer.files].filter(f=>f.type.startsWith('image/')).forEach(insertImageFile); });
+  stage.addEventListener('dragstart',e=>{ if(editing&&e.target.closest&&e.target.closest('.pad')) e.preventDefault(); });
+  note.addEventListener('input',()=>{ if(!editing||cur<0) return; slides[cur].dataset.note=note.textContent.trim(); dirty=true; saveDraftDebounced(); });
+
+  // 圖片
+  function insertImageFile(file){ shrink(file).then(insertImage); }
+  function shrink(file){
+    return new Promise(res=>{
+      const raw=()=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.readAsDataURL(file); };
+      if(/svg|gif/.test(file.type)) return raw();
+      const img=new Image(), u=URL.createObjectURL(file);
+      img.onload=()=>{
+        const MAX=1600, k=Math.min(1,MAX/Math.max(img.width,img.height));
+        const c=document.createElement('canvas'); c.width=Math.round(img.width*k); c.height=Math.round(img.height*k);
+        c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+        res(file.type==='image/png'?c.toDataURL('image/png'):c.toDataURL('image/jpeg',.86));
+        URL.revokeObjectURL(u);
+      };
+      img.onerror=raw; img.src=u;
+    });
+  }
+  function insertImage(dataUrl){
+    if(cur<0) return;
+    snapshot();
+    const fig=document.createElement('figure'); fig.className='img c'; fig.setAttribute('data-r',''); fig.style.width='55%';
+    const img=document.createElement('img'); img.src=dataUrl; img.alt=''; img.draggable=false; fig.appendChild(img);
+    const pad=slides[cur].querySelector('.pad');
+    let anchor=sel&&pad.contains(sel)?sel:null;
+    while(anchor&&anchor.parentElement!==pad) anchor=anchor.parentElement;
+    if(anchor) anchor.after(fig); else pad.appendChild(fig);
+    img.addEventListener('load',()=>{changed();select(fig);},{once:true});
+    changed(); select(fig);
+  }
+  function scaleOf(pad){ const m=/scale\(([\d.]+)\)/.exec(pad.style.transform||''); return m?+m[1]:1; }
+  function contentWidth(pad){ const cs=getComputedStyle(pad); return pad.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight); }
+  function toggleFree(fig){
+    const pad=fig.closest('.pad');
+    if(fig.classList.contains('free')){
+      fig.classList.remove('free'); fig.style.left=''; fig.style.top='';
+      fig.style.width=Math.min(100,parseFloat(fig.style.width)||55)+'%';
+    }else{
+      const r=fig.getBoundingClientRect(), p=pad.getBoundingClientRect(), k=scaleOf(pad);
+      fig.classList.add('free'); fig.classList.remove('c','r');
+      fig.style.left=((r.left-p.left)/k/pad.clientWidth*100).toFixed(2)+'%';
+      fig.style.top=((r.top-p.top)/k/pad.clientHeight*100).toFixed(2)+'%';
+      fig.style.width=(r.width/k/pad.clientWidth*100).toFixed(2)+'%';
+    }
+  }
+  function startDrag(e,fig){
+    e.preventDefault();
+    const pad=fig.closest('.pad'), k=scaleOf(pad);
+    const sx=e.clientX, sy=e.clientY, L=parseFloat(fig.style.left)||0, T=parseFloat(fig.style.top)||0;
+    let snap=false;
+    const mv=ev=>{ if(!snap){snapshot();snap=true;} fig.style.left=(L+(ev.clientX-sx)/k/pad.clientWidth*100).toFixed(2)+'%'; fig.style.top=(T+(ev.clientY-sy)/k/pad.clientHeight*100).toFixed(2)+'%'; placeStrip(); };
+    const up=()=>{ removeEventListener('mousemove',mv); removeEventListener('mouseup',up); if(snap){dirty=true;saveDraft();} };
+    addEventListener('mousemove',mv); addEventListener('mouseup',up);
+  }
+  handle.addEventListener('mousedown',e=>{
+    if(!sel||!sel.classList.contains('img')) return;
+    e.preventDefault();
+    const fig=sel, pad=fig.closest('.pad'), k=scaleOf(pad), r0=fig.getBoundingClientRect(), sx=e.clientX;
+    const base=fig.classList.contains('free')?pad.clientWidth:contentWidth(pad);
+    let snap=false;
+    const mv=ev=>{ if(!snap){snapshot();snap=true;} const w=Math.max(40,(r0.width+(ev.clientX-sx))/k); fig.style.width=Math.min(100,w/base*100).toFixed(2)+'%'; placeStrip(); };
+    const up=()=>{ removeEventListener('mousemove',mv); removeEventListener('mouseup',up); if(snap) changed(); };
+    addEventListener('mousemove',mv); addEventListener('mouseup',up);
+  });
+
+  // 復原、還原、變更
+  function pushUndo(fn){ undo.push(fn); if(undo.length>60) undo.shift(); }
+  function snapshot(){ const s=slides[cur], html=s.innerHTML; pushUndo(()=>{ s.innerHTML=html; if(editing) s.querySelector('.pad').setAttribute('contenteditable','true'); }); }
+  function undoLast(){ const fn=undo.pop(); if(!fn){ toast('沒有可以復原的操作'); return; } select(null); fn(); refresh(); go(Math.min(cur,N-1),true); dirty=true; saveDraft(); }
+  function pristineSection(i){
+    if(!pristineDoc) pristineDoc=new DOMParser().parseFromString(PRISTINE,'text/html');
+    const secs=pristineDoc.querySelectorAll('.slide'); return secs[i]?secs[i].innerHTML:null;
+  }
+  function revertSlide(){
+    const s=slides[cur]; const html=original.has(s)?original.get(s):pristineSection(cur);
+    if(html==null){ toast('這一頁沒有原始版本可以還原'); return; }
+    snapshot(); select(null); s.innerHTML=html; refresh(); go(cur,true); dirty=true; saveDraft();
+  }
+  function changed(){ dirty=true; stagger(); fitAll(); placeStrip(); saveDraftDebounced(); }
+
+  // 頁面操作
+  function cleanClone(sec){
+    const c=sec.cloneNode(true);
+    c.classList.remove('on');
+    const p=c.querySelector('.pad');
+    if(p){ p.removeAttribute('contenteditable'); ['transform','transform-origin','width','height','bottom'].forEach(k=>p.style.removeProperty(k)); if(!p.getAttribute('style')) p.removeAttribute('style'); }
+    c.querySelectorAll('.sel').forEach(el=>el.classList.remove('sel'));
+    c.querySelectorAll('[data-r]').forEach(el=>{ el.style.removeProperty('--i'); if(!el.getAttribute('style')) el.removeAttribute('style'); });
+    c.querySelectorAll('img[draggable]').forEach(i=>i.removeAttribute('draggable'));
+    return c;
+  }
+  function dupSlide(){ const s=slides[cur], c=cleanClone(s); s.after(c); original.set(c,c.innerHTML); const idx=cur; pushUndo(()=>{c.remove();cur=Math.min(idx,N-2);}); refresh(); go(idx+1,true); dirty=true; saveDraft(); }
+  function blankSlide(){
+    const s=slides[cur], c=document.createElement('section'); c.className='slide'; c.dataset.tag=s.dataset.tag||''; c.dataset.note='';
+    c.innerHTML='<div class="pad"><div class="eyebrow" data-r>新的一頁</div><h3 class="h3" data-r style="margin-top:1.4cqw">標題</h3><p class="lead" data-r>內文。點這裡直接修改，或用下方工具列插入圖片。</p></div>';
+    s.after(c); original.set(c,c.innerHTML); const idx=cur; pushUndo(()=>{c.remove();cur=Math.min(idx,N-2);}); refresh(); go(idx+1,true); dirty=true; saveDraft();
+  }
+  function delSlide(){
+    if(N<=1){ toast('至少要留一頁'); return; }
+    const s=slides[cur], nx=s.nextElementSibling, idx=cur;
+    pushUndo(()=>{ nx.before(s); cur=idx; });
+    select(null); s.remove(); refresh(); go(Math.min(idx,N-1),true); dirty=true; saveDraft();
+    toast('已刪除這一頁（↶ 復原 可以救回來）');
+  }
+  function moveSlide(d){
+    const s=slides[cur], t=slides[cur+d]; if(!t) return;
+    const idx=cur;
+    pushUndo(()=>{ if(d<0) s.before(t); else s.after(t); cur=idx; });
+    if(d<0) t.before(s); else t.after(s);
+    refresh(); go(idx+d,true); dirty=true; saveDraft();
+  }
+
+  // 序列化：#stage 內從 #fx 之後到 .zone.l 之前的節點（含註解與空白），投影片用清理過的版本
+  function slidesAreaHTML(){
+    const parts=[]; const stop=document.getElementById('zl');
+    for(let n=document.getElementById('fx').nextSibling; n&&n!==stop; n=n.nextSibling){
+      if(n.nodeType===8) parts.push('<!--'+n.data+'-->');
+      else if(n.nodeType===3) parts.push(n.data);
+      else if(n.nodeType===1&&n.classList.contains('slide')) parts.push(cleanClone(n).outerHTML);
+      else if(n.nodeType===1) parts.push(n.outerHTML);
+    }
+    return parts.join('');
+  }
+  const FX='<div id="fx"></div>', UI='<!-- ══════════ UI ══════════ -->';
+  function buildDocument(){
+    const a=PRISTINE.indexOf(FX)+FX.length, b=PRISTINE.indexOf(UI);
+    if(a<FX.length||b<0) throw new Error('找不到投影片區的邊界標記');
+    return '<!doctype html>\n'+PRISTINE.slice(0,a)+slidesAreaHTML()+PRISTINE.slice(b);
+  }
+  async function exportHTML(){
+    let html; try{ html=buildDocument(); }catch(e){ toast('匯出失敗：'+e.message,5000); return; }
+    let how='download';
+    if(window.showSaveFilePicker){
+      try{
+        const h=await showSaveFilePicker({suggestedName:FILE,types:[{description:'HTML',accept:{'text/html':['.html']}}]});
+        const w=await h.createWritable(); await w.write(html); await w.close(); how='picker';
+      }catch(e){ if(e.name==='AbortError') return; how='download'; }
+    }
+    if(how==='download'){
+      const blob=new Blob([html],{type:'text/html'}), a=document.createElement('a');
+      a.href=URL.createObjectURL(blob); a.download=FILE; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(a.href),10000);
+    }
+    dirty=false; clearDraft();
+    toast(how==='picker'?'已儲存 '+FILE:'已匯出 '+FILE+' 到下載資料夾 — 請用它取代 slides/ 裡的同名檔案',5000);
+  }
+  // 供驗證用（不影響使用）
+  window.__deck={buildDocument,insertImage,slidesAreaHTML,restoreDraft,get slides(){return slides;},get cur(){return cur;},setEditing,go,refresh};
+
+  // 草稿：每次改動都暫存到瀏覽器，忘記匯出也不會丟
+  function saveDraft(){ try{ localStorage.setItem(DRAFT_KEY,JSON.stringify({t:Date.now(),html:slidesAreaHTML()})); }catch(e){} }
+  function saveDraftDebounced(){ clearTimeout(draftTimer); draftTimer=setTimeout(saveDraft,600); }
+  function clearDraft(){ try{ localStorage.removeItem(DRAFT_KEY); }catch(e){} }
+  function restoreDraft(html){
+    const stop=document.getElementById('zl');
+    for(let n=document.getElementById('fx').nextSibling; n&&n!==stop;){ const nx=n.nextSibling; n.remove(); n=nx; }
+    const t=document.createElement('template'); t.innerHTML=html; stop.before(t.content);
+    original.clear(); refresh(); go(Math.max(0,Math.min(cur,N-1)),true); dirty=true;
+  }
+  addEventListener('beforeunload',e=>{ if(dirty){ e.preventDefault(); e.returnValue=''; } });
+
+  // 工具列
+  etb.addEventListener('click',e=>{
+    const b=e.target.closest('button[data-e]'); if(!b) return;
+    const fn={prev:()=>go(cur-1),next:()=>go(cur+1),toc:()=>toggle(toc),notes:()=>note.classList.toggle('on'),
+      dup:dupSlide,blank:blankSlide,mvL:()=>moveSlide(-1),mvR:()=>moveSlide(1),delSlide,undo:undoLast,revert:revertSlide,
+      save:exportHTML,exit:()=>setEditing(false)}[b.dataset.e];
+    if(fn) fn();
+  });
+  efile.addEventListener('change',()=>{ [...efile.files].forEach(insertImageFile); efile.value=''; });
+  ebtn.addEventListener('click',()=>setEditing(!editing));
+  document.getElementById('drestore').addEventListener('click',()=>{ try{ const d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null'); if(d&&d.html){ restoreDraft(d.html); setEditing(true); toast('已還原草稿，記得匯出'); } }catch(e){} dbanner.hidden=true; });
+  document.getElementById('ddiscard').addEventListener('click',()=>{ clearDraft(); dbanner.hidden=true; });
+
+  // ── 啟動 ─────────────────────────────────────────────────
+  refresh();
+  const start=parseInt(location.hash.slice(1),10);
+  go(Number.isFinite(start)&&start>0?start-1:0);
+  // 字型載入完成、資源載入完成、分頁重新可見時，再配適一次（第一次量測可能用的是替代字型）
+  const refit=()=>{fitAll();placeStrip();};
+  if(document.fonts&&document.fonts.ready) document.fonts.ready.then(refit);
+  addEventListener('load',refit);
+  document.addEventListener('visibilitychange',()=>{ if(!document.hidden) refit(); });
+  // 舞台尺寸只要有任何變化（視窗縮放、全螢幕、DevTools、裝置模擬）都重新配適
+  let rt; const refitSoon=()=>{clearTimeout(rt);rt=setTimeout(refit,120);};
+  addEventListener('resize',refitSoon);
+  if(window.ResizeObserver){ let w0=stage.clientWidth; new ResizeObserver(()=>{ if(stage.clientWidth!==w0){ w0=stage.clientWidth; refitSoon(); } }).observe(stage); }
+  try{ const d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null'); if(d&&d.html) dbanner.hidden=false; }catch(e){}
+})();
+</script></body></html>
