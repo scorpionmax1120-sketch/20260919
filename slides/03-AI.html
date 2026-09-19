@@ -190,6 +190,10 @@ body.editing #note:empty::after{content:"（點這裡輸入這一頁的講者備
 .eyebrow.plain b{color:var(--fg)}
 /* 標題的螢光標記 */
 mark{background:var(--acc);color:#fff;padding:0 1cqw;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+/* inline 元素的背景高度由字型的 em box 決定（Noto Sans TC 約 1.45em），
+   跟 line-height 無關。標題若用預設的緊行距，色塊會往上蓋到前一行的字，
+   所以含 mark 的標題要把行距撐開到 1.45em 以上再加一點視覺間隙。 */
+.h1:has(mark),.h2:has(mark){line-height:1.65}
 .h1,.h2,.h3{font-weight:900}
 /* 程式碼是黑底，配色要獨立一套 */
 .code{color:#efeee2;box-shadow:var(--shadow)}
